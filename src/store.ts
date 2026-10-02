@@ -17,6 +17,7 @@ export type Task = {
   dateDone: string
   notes: string
 }
+export type TaskInput = Omit<Task, 'id' | 'phase'> & { id: string | number; phase: number | string }
 export type Review = {
   hoursSpent: number
   whatIFinished: string
@@ -39,45 +40,73 @@ type AppState = {
   setStartDate: (date: string) => void
   setPausedWeeks: (weeks: number) => void
   setProjectLinks: (name: string, links: { github: string; demo: string; live: string }) => void
-  importData: (data: Partial<Pick<AppState, 'tasks' | 'reviews' | 'theme' | 'startDate' | 'pausedWeeks' | 'projectLinks'>>) => void
+  importData: (data: Partial<Omit<AppState, 'tasks' | 'taskEdits'>> & { tasks?: TaskInput[] }) => void
   reset: () => void
 }
 
-const initialTasks = taskRows as Task[]
+export const normalizeTask = (task: TaskInput): Task => ({
+  ...task,
+  id: String(task.id),
+  phase: typeof task.phase === 'number' ? task.phase : Number(task.phase.match(/^\d+/)?.[0]),
+})
+const initialTasks = (taskRows as TaskInput[]).map(normalizeTask)
 const blankReview = (): Review => ({ hoursSpent: 0, whatIFinished: '', whatBlockedMe: '', postedThisWeek: false, nextWeeksGoals: '' })
+const today = () => new Date().toISOString().slice(0, 10)
+
+const applyTaskUpdate = (task: Task, update: Partial<Pick<Task, 'status' | 'dateDone' | 'notes'>>) => {
+  let status = update.status ?? task.status
+  let dateDone = update.dateDone ?? task.dateDone
+  if (update.status && update.status !== task.status) dateDone = update.status === 'Done' ? dateDone || today() : ''
+  else if (task.status === 'Done' && 'dateDone' in update && !update.dateDone) status = 'In progress'
+  if (status === 'Done' && !dateDone) dateDone = today()
+  if (status !== 'Done') dateDone = ''
+  return { ...task, ...update, status, dateDone }
+}
 
 export const useRoadmap = create<AppState>()(persist((set) => ({
   tasks: initialTasks,
   taskEdits: {},
   reviews: {},
   theme: 'dark',
-  startDate: new Date().toISOString().slice(0, 10),
+  startDate: today(),
   pausedWeeks: 0,
   projectLinks: {},
-  updateTask: (id, update) => set((state) => ({
-    tasks: state.tasks.map((task) => task.id === id ? { ...task, ...update } : task),
-    taskEdits: { ...state.taskEdits, [id]: { ...state.taskEdits[id], ...update } },
-  })),
+  updateTask: (id, update) => set((state) => {
+    const task = state.tasks.find((item) => item.id === id)
+    if (!task) return state
+    const updated = applyTaskUpdate(task, update)
+    return {
+      tasks: state.tasks.map((item) => item.id === id ? updated : item),
+      taskEdits: { ...state.taskEdits, [id]: { status: updated.status, dateDone: updated.dateDone, notes: updated.notes } },
+    }
+  }),
   updateMany: (ids, status) => set((state) => {
     const taskEdits = { ...state.taskEdits }
     const tasks = state.tasks.map((task) => {
       if (!ids.includes(task.id)) return task
-      const dateDone = status === 'Done' ? task.dateDone || new Date().toISOString().slice(0, 10) : task.dateDone
-      taskEdits[task.id] = { ...taskEdits[task.id], status, dateDone }
-      return { ...task, status, dateDone }
+      const updated = applyTaskUpdate(task, { status })
+      taskEdits[task.id] = { status: updated.status, dateDone: updated.dateDone, notes: updated.notes }
+      return updated
     })
     return { tasks, taskEdits }
   }),
   saveReview: (week, review) => set((state) => ({ reviews: { ...state.reviews, [week]: review } })),
   setTheme: (theme) => set({ theme }),
   setStartDate: (startDate) => set({ startDate }),
-  setPausedWeeks: (pausedWeeks) => set({ pausedWeeks }),
+  setPausedWeeks: (pausedWeeks) => set((state) => {
+    const start = new Date(`${state.startDate}T00:00:00Z`)
+    start.setUTCDate(start.getUTCDate() + (pausedWeeks - state.pausedWeeks) * 7)
+    return { startDate: start.toISOString().slice(0, 10), pausedWeeks }
+  }),
   setProjectLinks: (name, links) => set((state) => ({ projectLinks: { ...state.projectLinks, [name]: links } })),
   importData: (data) => set((state) => {
     const taskEdits = { ...state.taskEdits }
     for (const imported of data.tasks ?? []) {
-      if (!state.tasks.some((task) => task.id === imported.id)) continue
-      taskEdits[imported.id] = { status: imported.status, dateDone: imported.dateDone, notes: imported.notes }
+      const normalized = normalizeTask(imported)
+      const current = state.tasks.find((task) => task.id === normalized.id)
+      if (!current || !['Not started', 'In progress', 'Done'].includes(normalized.status)) continue
+      const updated = applyTaskUpdate(current, { status: normalized.status, dateDone: normalized.dateDone, notes: normalized.notes })
+      taskEdits[current.id] = { status: updated.status, dateDone: updated.dateDone, notes: updated.notes }
     }
     return {
       ...state,
@@ -86,7 +115,7 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       taskEdits,
     }
   }),
-  reset: () => set({ tasks: initialTasks, taskEdits: {}, reviews: {}, theme: 'dark', startDate: new Date().toISOString().slice(0, 10), pausedWeeks: 0, projectLinks: {} }),
+  reset: () => set({ tasks: initialTasks, taskEdits: {}, reviews: {}, theme: 'dark', startDate: today(), pausedWeeks: 0, projectLinks: {} }),
 }), {
   name: 'roadmap-tracker-v1',
   partialize: (state) => ({ taskEdits: state.taskEdits, reviews: state.reviews, theme: state.theme, startDate: state.startDate, pausedWeeks: state.pausedWeeks, projectLinks: state.projectLinks }) as AppState,
