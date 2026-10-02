@@ -37,6 +37,8 @@ Settings imports and exports JSON backups and CSV task rows. CSV imports must ma
 
 Run `npm test` to run the Vitest data and metrics tests.
 
+Each route is a lazily loaded page module under `src/pages/`; the app shell and shared UI live in `src/App.tsx` and `src/components/shared.tsx`. Vite emits separate route chunks in production builds.
+
 ## Deploy
 
 The app is a static Vite build. Import this folder into Vercel and use the defaults (`npm run build`, output directory `dist`). `vercel.json` rewrites deep links to the app entry point. For GitHub Pages, set Vite's `base` to the repository path and deploy the `dist/` directory; use a Pages SPA 404 fallback for deep links.
