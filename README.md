@@ -13,15 +13,15 @@ Run `npm run build` to type-check and produce the static site in `dist/`.
 
 ## Load the task plan
 
-Replace `data/tasks.json` with the supplied task rows. Each row follows this shape:
+The supplied 187 task rows are loaded from `data/tasks.json`. Numeric IDs and phase labels such as `1 Foundations` are normalized by the store. Additional task imports should keep the same fields:
 
 ```json
 {
-  "id": "W01-AI-01",
-  "phase": 1,
+  "id": 1,
+  "phase": "1 Foundations",
   "week": 1,
   "track": "AI/ML",
-  "project": "H5 Paper reproduction",
+  "project": "Foundations",
   "topic": "Set up the baseline",
   "output": "A reproducible training run",
   "resource": "https://example.com/reference",
@@ -31,7 +31,11 @@ Replace `data/tasks.json` with the supplied task rows. Each row follows this sha
 }
 ```
 
-Valid tracks are `AI/ML`, `Robotics`, `Design/Web`, `Video/Social`, and `Resume`. Valid statuses are `Not started`, `In progress`, and `Done`. The checked-in JSON is a 10-row starter fixture because the full 187 task rows were not included with the request. Existing browser data is independent of this file; use Settings to export a backup before replacing the plan.
+Valid tracks are `AI/ML`, `Robotics`, `Design/Web`, `Video/Social`, and `Resume`. Valid statuses are `Not started`, `In progress`, and `Done`. User edits are stored separately from the fixed plan; matching IDs retain their updates when the plan is replaced. Export a backup before changing task IDs.
+
+Settings imports and exports JSON backups and CSV task rows. CSV imports must match the exported task columns. Changing the exam pause count shifts the plan start date by the difference in weeks, so current-week and finish-date calculations move with it.
+
+Run `npm test` to run the Vitest data and metrics tests.
 
 ## Deploy
 

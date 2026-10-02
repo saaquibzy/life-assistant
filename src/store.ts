@@ -53,7 +53,7 @@ const initialTasks = (taskRows as TaskInput[]).map(normalizeTask)
 const blankReview = (): Review => ({ hoursSpent: 0, whatIFinished: '', whatBlockedMe: '', postedThisWeek: false, nextWeeksGoals: '' })
 const today = () => new Date().toISOString().slice(0, 10)
 
-const applyTaskUpdate = (task: Task, update: Partial<Pick<Task, 'status' | 'dateDone' | 'notes'>>) => {
+export const applyTaskUpdate = (task: Task, update: Partial<Pick<Task, 'status' | 'dateDone' | 'notes'>>) => {
   let status = update.status ?? task.status
   let dateDone = update.dateDone ?? task.dateDone
   if (update.status && update.status !== task.status) dateDone = update.status === 'Done' ? dateDone || today() : ''
