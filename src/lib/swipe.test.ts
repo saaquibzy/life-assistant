@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveSwipe, type RoadmapTask } from './roadmap'
-import { buildStepDeck, isSkippedToday, skipStep, undoStepSkip } from './swipe'
+import { buildStepDeck, isSkippedToday, skipStep, swipeAction, undoStepSkip } from './swipe'
 
 const task = (id: string, values: Partial<RoadmapTask> = {}): RoadmapTask => ({
   id, trackCode: 'RB', phase: 0, step: id, budgetHours: 1, hoursNote: '1', needs: 'none', doneWhen: 'Done', optional: false,
@@ -21,5 +21,9 @@ describe('swipe helpers', () => {
   it('undo restores the prior skipped date', () => {
     const rows = [task('one', { skippedAt: '2026-02-02' })]
     expect(undoStepSkip(skipStep(rows, 'one', '2026-02-03'), 'one', rows[0].skippedAt)[0].skippedAt).toBe('2026-02-02')
+  })
+  it('maps a right swipe on a step card to the start action', () => {
+    expect(swipeAction('steps', 'right')).toBe('start-step')
+    expect(swipeAction('topics', 'right')).toBe('choose-topic')
   })
 })

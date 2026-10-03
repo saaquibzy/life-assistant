@@ -1,6 +1,13 @@
 import { isUnlocked, resolveSwipe, type RoadmapTask } from './roadmap'
 export { resolveSwipe }
 
+export type SwipeStage = 'topics' | 'steps'
+export type SwipeAction = 'defer-topic' | 'choose-topic' | 'skip-step' | 'start-step'
+export function swipeAction(stage: SwipeStage, direction: 'left' | 'right'): SwipeAction {
+  if (stage === 'topics') return direction === 'right' ? 'choose-topic' : 'defer-topic'
+  return direction === 'right' ? 'start-step' : 'skip-step'
+}
+
 export function isSkippedToday(task: Pick<RoadmapTask, 'skippedAt'>, date = new Date().toISOString().slice(0, 10)): boolean {
   return task.skippedAt === date
 }

@@ -4,7 +4,7 @@ import { ArrowLeft, RotateCcw, Play, SkipForward, Check, Info } from 'lucide-rea
 import { useNavigate } from 'react-router-dom'
 import { PageTitle, Panel, topics } from '../components/shared'
 import { getBlockingParents, isUnlocked } from '../lib/roadmap'
-import { buildStepDeck, isSkippedToday, resolveSwipe } from '../lib/swipe'
+import { buildStepDeck, isSkippedToday, resolveSwipe, swipeAction } from '../lib/swipe'
 import { useRoadmap } from '../store'
 
 type UndoEntry = { kind: 'topic'; topic: string; queue: string[] } | { kind: 'step'; taskId: string; previousSkippedAt: string | null }
@@ -35,7 +35,7 @@ export default function SwipePage() {
     if (useRoadmap.getState().startTask(id)) { buzz(); navigate(`/focus/${id}`); return true }
     return false
   }
-  const startCurrentStep = () => { if (currentTask) startTask(currentTask.id) }
+  const startCurrentStep = () => currentTask ? startTask(currentTask.id) : false
   const undoLast = () => {
     const entry = undo.at(-1); if (!entry) return
     setUndo(items=>items.slice(0,-1))
@@ -43,8 +43,19 @@ export default function SwipePage() {
     else { const task=useRoadmap.getState().tasks.find(t=>t.id===entry.taskId); if(task) useRoadmap.getState().updateTask(entry.taskId,{skippedAt:entry.previousSkippedAt}) }
     setFlipped(false)
   }
-  const swipe = (direction:'left'|'right') => { if(stage==='topics') { if(direction==='left') skipTopic(); else if(currentTopic) { buzz(); enterTopic(currentTopic) } } else if(direction==='left') skipCurrentStep(); else startCurrentStep() }
-  const handleDragEnd = async (offset: number, velocity: number) => { const direction=resolveSwipe(offset,velocity); if(direction==='none')return; setFlyDirection(direction); await new Promise(resolve=>window.setTimeout(resolve,170)); swipe(direction); setFlyDirection(null); dragX.set(0) }
+  const applySwipeAction = (action: ReturnType<typeof swipeAction>) => {
+    if (action === 'defer-topic') skipTopic()
+    else if (action === 'choose-topic' && currentTopic) { buzz(); enterTopic(currentTopic) }
+    else if (action === 'skip-step') skipCurrentStep()
+    else if (action === 'start-step') startCurrentStep()
+  }
+  const swipe = (direction:'left'|'right') => applySwipeAction(swipeAction(stage,direction))
+  const handleDragEnd = async (offset: number, velocity: number) => {
+    const direction=resolveSwipe(offset,velocity); if(direction==='none')return
+    const action=swipeAction(stage,direction)
+    if(action==='start-step') { if(!startCurrentStep())setFlyDirection(null); return }
+    setFlyDirection(direction); await new Promise(resolve=>window.setTimeout(resolve,170)); applySwipeAction(action); setFlyDirection(null); dragX.set(0)
+  }
   useEffect(() => { const onKey=(event:KeyboardEvent)=>{ if (['INPUT','TEXTAREA','SELECT'].includes((event.target as HTMLElement).tagName)) return; if(event.key==='ArrowLeft') { event.preventDefault(); swipe('left') } else if(event.key==='ArrowRight') { event.preventDefault(); swipe('right') } else if(event.key.toLowerCase()==='z') undoLast() }; window.addEventListener('keydown',onKey); return()=>window.removeEventListener('keydown',onKey) })
 
   const topicCards = topicQueue.map(name=>topics.find(topic=>topic.name===name)).filter((t):t is typeof topics[number]=>Boolean(t))
