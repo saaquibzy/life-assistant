@@ -10,6 +10,7 @@ import {
   resolveSwipe,
   type RoadmapTask,
 } from './roadmap'
+import { parseTableRow } from '../../scripts/parse-roadmap'
 
 const tasks: RoadmapTask[] = [
   {
@@ -89,6 +90,19 @@ const tasks: RoadmapTask[] = [
     skippedAt: null,
   },
 ]
+
+describe('markdown parser', () => {
+  it('keeps escaped pipes as literal content inside a table cell', () => {
+    const row = '| DW-01 | Tracker: secrets check (`grep -rniE "sk-\\|api[_-]?key\\|secret\\|token" api/ src/`), push (`--force-with-lease` after checking the remote), deploy on Vercel, README with screenshots | 0.75 | none | Live URL, README with screenshots,no secrets in the repo |'
+    expect(parseTableRow(row)).toEqual([
+      'DW-01',
+      'Tracker: secrets check (`grep -rniE "sk-|api[_-]?key|secret|token" api/ src/`), push (`--force-with-lease` after checking the remote), deploy on Vercel, README with screenshots',
+      '0.75',
+      'none',
+      'Live URL, README with screenshots,no secrets in the repo',
+    ])
+  })
+})
 
 describe('roadmap parsing and gating', () => {
   it('parses standard and range-based hour strings', () => {

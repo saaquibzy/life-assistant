@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { gateCycleCheck, normalizeNeeds, parseHours, type RoadmapTask } from '../src/lib/roadmap'
 
@@ -20,11 +20,35 @@ const topicCatalog = [
   { slug: 'resume-and-jobs', name: 'Resume and Jobs', code: 'JB', color: '#60a5fa', icon: 'briefcase', description: 'Profiles, resumes, job applications, and interview prep.' },
 ]
 
-function parseTableRow(raw: string): string[] {
-  return raw
-    .split('|')
-    .map((cell) => cell.trim())
-    .slice(1, -1)
+export function parseTableRow(raw: string): string[] {
+  const cells: string[] = []
+  let current = ''
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index]
+
+    if (char === '\\' && raw[index + 1] === '|') {
+      current += '|'
+      index += 1
+      continue
+    }
+
+    if (char === '|') {
+      if (index === 0 || index === raw.length - 1) continue
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  const last = current.trim()
+  if (last.length > 0 || cells.length > 0) {
+    cells.push(last)
+  }
+
+  return cells
 }
 
 function normalizeTrackCode(raw: string): RoadmapTask['trackCode'] {
@@ -40,7 +64,7 @@ function detectTopicFromId(taskId: string): string {
   return found?.name ?? 'General'
 }
 
-function parseRoadmapMarkdown(markdown: string) {
+export function parseRoadmapMarkdown(markdown: string) {
   const lines = markdown.split(/\r?\n/)
   const tasks: RoadmapTask[] = []
   const phaseGates: Record<number, string> = {}
@@ -196,4 +220,7 @@ function main() {
   console.log(`Generated: ${path.relative(projectRoot, path.join(outDir, 'tasks.json'))}, ${path.relative(projectRoot, path.join(outDir, 'phases.json'))}, ${path.relative(projectRoot, path.join(outDir, 'cut-order.json'))}, ${path.relative(projectRoot, path.join(outDir, 'topics.json'))}`)
 }
 
-main()
+const isDirectExecution = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+if (isDirectExecution) {
+  main()
+}
