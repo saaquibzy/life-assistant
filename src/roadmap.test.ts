@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyTaskUpdate, initialTasks, migratePersistedState } from './store'
+import { applyTaskUpdate, initialTasks, mergeTaskProgress, migratePersistedState } from './store'
 import { coreHours, nextUnlocked, optionalHours, progressByPhase } from './lib/roadmap'
 import taskRows from '../data/tasks.json'
 import topicRows from '../data/topics.json'
+import phaseRows from '../data/phases.json'
 
 const tasks = taskRows as Array<Record<string, unknown>>
 const topics = topicRows as Array<{ name: string; groups: Array<{ name: string; taskIds: string[] }> }>
@@ -31,6 +32,16 @@ describe('task state', () => {
     })
   })
 
+  it('populates all seven topics, meaningful groups, and six parsed exit gates', () => {
+    expect(topics).toHaveLength(7)
+    expect(topics.every((topic) => topic.groups.length > 0)).toBe(true)
+    expect(tasks.every((task) => task.group !== 'general')).toBe(true)
+    expect(phaseRows).toHaveLength(6)
+    expect(phaseRows.every((phase) => phase.name && phase.gate)).toBe(true)
+    expect(tasks.find((task) => task.id === 'DW-06')?.topic).toBe('Design')
+    expect(tasks.find((task) => task.id === 'DW-12')?.topic).toBe('Portfolio Website')
+  })
+
   it('normalizes the supplied roadmap data without the old 24-week assumptions', () => {
     expect(initialTasks[0]).toMatchObject({ id: 'JB-01', phase: 0, topic: 'Resume and Jobs' })
     expect(tasks).toHaveLength(186)
@@ -53,6 +64,18 @@ describe('task state', () => {
       migrationBackup: null,
     }
     expect(migratePersistedState(persisted, 2)).toBe(persisted)
+  })
+
+  it('refreshes plan metadata while preserving saved task progress', () => {
+    const current = initialTasks.find((task) => task.id === 'DW-04')!
+    const saved = { ...current, topic: 'GitHub Polishing', group: 'general', status: 'done' as const, notes: 'design notes' }
+    const [merged] = mergeTaskProgress([current], [saved])
+    expect(merged).toMatchObject({
+      topic: 'Design',
+      group: 'Design the portfolio in Figma',
+      status: 'done',
+      notes: 'design notes',
+    })
   })
 
   it('starts empty storage with the fresh v2 task list and no backup prompt', () => {
@@ -92,8 +115,9 @@ describe('task state', () => {
     expect(phaseTotals[4]).toBeCloseTo(47.5)
     expect(phaseTotals[5]).toBeCloseTo(59)
 
-    expect(coreHours(tasks as never[])).toBeCloseTo(289.1)
-    expect(optionalHours(tasks as never[])).toBeCloseTo(6)
+    expect(coreHours(tasks as never[])).toBeCloseTo(280.6)
+    expect(optionalHours(tasks as never[])).toBeCloseTo(14.5)
+    expect(tasks.filter((task) => task.optional)).toHaveLength(5)
     expect(tasks.find((task) => task.id === 'RB-59')?.optional).toBe(true)
     expect(progressByPhase(tasks as never[], 0)).toMatchObject({ totalSteps: 9, totalHours: 6.1 })
   })

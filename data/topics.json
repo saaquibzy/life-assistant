@@ -8,10 +8,15 @@
     "description": "ROS 2, service robots, warehouse systems, and robotic hardening work.",
     "groups": [
       {
-        "name": "general",
+        "name": "Setup",
         "taskIds": [
           "RB-01",
-          "RB-02",
+          "RB-02"
+        ]
+      },
+      {
+        "name": "Robot R1 (service robot)",
+        "taskIds": [
           "RB-03",
           "RB-04",
           "RB-05",
@@ -30,7 +35,12 @@
           "RB-18",
           "RB-19",
           "RB-20",
-          "RB-21",
+          "RB-21"
+        ]
+      },
+      {
+        "name": "C++ basics and Robot R2 (warehouse)",
+        "taskIds": [
           "RB-22",
           "RB-23",
           "RB-24",
@@ -39,7 +49,12 @@
           "RB-27",
           "RB-28",
           "RB-29",
-          "RB-30",
+          "RB-30"
+        ]
+      },
+      {
+        "name": "Finish R2, harden, polish",
+        "taskIds": [
           "RB-31",
           "RB-32",
           "RB-33",
@@ -53,14 +68,24 @@
           "RB-41",
           "RB-42",
           "RB-43",
-          "RB-44",
+          "RB-44"
+        ]
+      },
+      {
+        "name": "R3 medical arm preparation",
+        "taskIds": [
           "RB-45",
           "RB-46",
           "RB-47",
           "RB-48",
           "RB-49",
           "RB-50",
-          "RB-51",
+          "RB-51"
+        ]
+      },
+      {
+        "name": "R3 medical arm",
+        "taskIds": [
           "RB-53",
           "RB-54",
           "RB-55",
@@ -81,7 +106,7 @@
     "description": "Python tooling, classical ML, neural nets, LLMs, and deployment skills.",
     "groups": [
       {
-        "name": "general",
+        "name": "Data tools and classical ML",
         "taskIds": [
           "ML-01",
           "ML-02",
@@ -95,7 +120,12 @@
           "ML-10",
           "ML-11",
           "ML-12",
-          "ML-13",
+          "ML-13"
+        ]
+      },
+      {
+        "name": "Neural networks and CNNs",
+        "taskIds": [
           "ML-14",
           "ML-15",
           "ML-16",
@@ -103,7 +133,12 @@
           "ML-18",
           "ML-19",
           "ML-20",
-          "ML-21",
+          "ML-21"
+        ]
+      },
+      {
+        "name": "Research Flagship work",
+        "taskIds": [
           "ML-22",
           "ML-23",
           "ML-24",
@@ -118,7 +153,12 @@
           "ML-33",
           "ML-34",
           "ML-35",
-          "ML-36",
+          "ML-36"
+        ]
+      },
+      {
+        "name": "LLMs and Deploy work",
+        "taskIds": [
           "ML-37",
           "ML-38",
           "ML-39",
@@ -130,7 +170,12 @@
           "ML-45",
           "ML-46",
           "ML-47",
-          "ML-48",
+          "ML-48"
+        ]
+      },
+      {
+        "name": "Paper",
+        "taskIds": [
           "ML-49",
           "ML-50",
           "ML-51",
@@ -149,35 +194,10 @@
     "description": "Repo hygiene, profile polish, and public-facing developer work.",
     "groups": [
       {
-        "name": "general",
+        "name": "Setup",
         "taskIds": [
           "DW-01",
-          "DW-02",
-          "DW-03",
-          "DW-04",
-          "DW-05",
-          "DW-06",
-          "DW-07",
-          "DW-08",
-          "DW-09",
-          "DW-10",
-          "DW-11",
-          "DW-12",
-          "DW-13",
-          "DW-14",
-          "DW-15",
-          "DW-16",
-          "DW-17",
-          "DW-18",
-          "DW-19",
-          "DW-20",
-          "DW-21",
-          "DW-22",
-          "DW-23",
-          "DW-24",
-          "DW-25",
-          "DW-26",
-          "DW-27"
+          "DW-02"
         ]
       }
     ]
@@ -189,7 +209,39 @@
     "color": "#fbbf24",
     "icon": "palette",
     "description": "Visual systems, dashboards, and design foundations for portfolio work.",
-    "groups": []
+    "groups": [
+      {
+        "name": "Design the portfolio in Figma",
+        "taskIds": [
+          "DW-04",
+          "DW-05",
+          "DW-06",
+          "DW-07",
+          "DW-08",
+          "DW-09",
+          "DW-10",
+          "DW-11"
+        ]
+      },
+      {
+        "name": "Build the portfolio",
+        "taskIds": [
+          "DW-14"
+        ]
+      },
+      {
+        "name": "Research Flagship work",
+        "taskIds": [
+          "DW-20"
+        ]
+      },
+      {
+        "name": "Finish work",
+        "taskIds": [
+          "DW-27"
+        ]
+      }
+    ]
   },
   {
     "slug": "portfolio-website",
@@ -198,7 +250,47 @@
     "color": "#fb7185",
     "icon": "layout",
     "description": "Portfolio buildout, case studies, and SEO polish.",
-    "groups": []
+    "groups": [
+      {
+        "name": "Setup",
+        "taskIds": [
+          "DW-03"
+        ]
+      },
+      {
+        "name": "Build the portfolio",
+        "taskIds": [
+          "DW-12",
+          "DW-13",
+          "DW-15",
+          "DW-16"
+        ]
+      },
+      {
+        "name": "Research Flagship work",
+        "taskIds": [
+          "DW-17",
+          "DW-18",
+          "DW-19"
+        ]
+      },
+      {
+        "name": "LLMs and Deploy work",
+        "taskIds": [
+          "DW-21",
+          "DW-22",
+          "DW-23",
+          "DW-24"
+        ]
+      },
+      {
+        "name": "Finish work",
+        "taskIds": [
+          "DW-25",
+          "DW-26"
+        ]
+      }
+    ]
   },
   {
     "slug": "videos",
@@ -209,9 +301,14 @@
     "description": "Editing, recording, reels, and social storytelling for projects.",
     "groups": [
       {
-        "name": "general",
+        "name": "Setup",
         "taskIds": [
-          "VD-01",
+          "VD-01"
+        ]
+      },
+      {
+        "name": "Editing basics and your first post",
+        "taskIds": [
           "VD-02",
           "VD-03",
           "VD-04",
@@ -219,20 +316,40 @@
           "VD-06",
           "VD-07",
           "VD-08",
-          "VD-09",
+          "VD-09"
+        ]
+      },
+      {
+        "name": "Core Builds work",
+        "taskIds": [
           "VD-10",
           "VD-11",
-          "VD-12",
+          "VD-12"
+        ]
+      },
+      {
+        "name": "Research Flagship work",
+        "taskIds": [
           "VD-13",
           "VD-14",
           "VD-15",
           "VD-16",
           "VD-17",
-          "VD-18",
+          "VD-18"
+        ]
+      },
+      {
+        "name": "LLMs and Deploy work",
+        "taskIds": [
           "VD-19",
           "VD-20",
           "VD-21",
-          "VD-22",
+          "VD-22"
+        ]
+      },
+      {
+        "name": "Finish work",
+        "taskIds": [
           "VD-23",
           "VD-24",
           "VD-25",
@@ -250,19 +367,39 @@
     "description": "Profiles, resumes, job applications, and interview prep.",
     "groups": [
       {
-        "name": "general",
+        "name": "Setup",
         "taskIds": [
           "JB-01",
           "JB-02",
-          "JB-03",
+          "JB-03"
+        ]
+      },
+      {
+        "name": "Core Builds work",
+        "taskIds": [
           "JB-04",
           "JB-05",
-          "JB-06",
+          "JB-06"
+        ]
+      },
+      {
+        "name": "Research Flagship work",
+        "taskIds": [
           "JB-07",
           "JB-08",
           "JB-09",
-          "JB-10",
-          "JB-11",
+          "JB-10"
+        ]
+      },
+      {
+        "name": "LLMs and Deploy work",
+        "taskIds": [
+          "JB-11"
+        ]
+      },
+      {
+        "name": "Finish work",
+        "taskIds": [
           "JB-12",
           "JB-13",
           "JB-14",

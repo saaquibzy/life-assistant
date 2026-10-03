@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { ArrowLeft, Check, CircleHelp } from 'lucide-react'
+import { ArrowLeft, Check, CircleHelp, LockKeyhole } from 'lucide-react'
 import { type Status, type Task, useRoadmap } from '../store'
-import { isUnlocked } from '../lib/roadmap'
+import { getBlockingParents, isUnlocked, progressByTopic, selectNextUnlockedInGroup } from '../lib/roadmap'
+import topicRows from '../../data/topics.json'
 
 export const phases = ['Setup', 'Foundations', 'Core builds', 'Research', 'Deployment', 'Finish']
+export type TopicInfo = { slug: string; name: string; code: string; color: string; icon: string; description: string; groups: Array<{ name: string; taskIds: string[] }> }
+export const topics = topicRows as TopicInfo[]
 const slugify = (value: string) => value.replaceAll('_', '-').toLowerCase()
 export const trackClass: Record<Task['trackCode'], string> = {
   ML: 'violet',
@@ -96,6 +99,44 @@ export function TaskRow({ task, compact = false }: { task: Task; compact?: boole
       {!compact && <StatusPill status={task.status} disabled={!unlocked} onChange={(status) => updateTask(task.id, { status })} />}
     </div>
   )
+}
+
+export function TaskStepItem({ task, tasks }: { task: Task; tasks: Task[] }) {
+  const unlocked = isUnlocked(task, { tasks })
+  const blockers = getBlockingParents(task, tasks)
+  return <article className={`task-step-item${unlocked ? '' : ' locked'}`}>
+    {!unlocked && <LockKeyhole size={15} aria-label="Locked" />}
+    <span className="task-step-id">{task.id}</span>
+    <div className="task-step-copy"><Link to={`/task/${task.id}`}><strong>{task.step}</strong></Link><small>{task.budgetHours} h · Phase {task.phase}{task.optional ? ' · Optional' : ''}</small>
+      {blockers.length > 0 && <div className="blocking-chips"><span>Needs</span>{blockers.slice(0, 4).map((parent) => <Link key={parent.id} to={`/task/${parent.id}`}>{parent.id}</Link>)}{blockers.length > 4 && <span>+{blockers.length - 4}</span>}</div>}
+    </div>
+    <StatusPill status={task.status} />
+  </article>
+}
+
+export function TopicCard({ topic, tasks }: { topic: TopicInfo; tasks: Task[] }) {
+  const topicTasks = tasks.filter((task) => task.topic === topic.name)
+  const coreTasks = topicTasks.filter((task) => !task.optional)
+  const progress = progressByTopic(tasks, topic.name)
+  const next = topic.groups.flatMap((group) => selectNextUnlockedInGroup(tasks, topic.name, group.name, 1))[0]
+  const unlocked = coreTasks.filter((task) => task.status !== 'done' && isUnlocked(task, { tasks })).length
+  const hours = coreTasks.reduce((sum, task) => sum + task.budgetHours, 0)
+  const doneHours = coreTasks.filter((task) => task.status === 'done').reduce((sum, task) => sum + task.budgetHours, 0)
+  const optionalBudget = topicTasks.filter((task) => task.optional).reduce((sum, task) => sum + task.budgetHours, 0)
+  return <article className="topic-card panel" style={{ '--topic-color': topic.color } as React.CSSProperties}>
+    <div className="topic-card-head"><span className="topic-icon">{topic.code}</span><Ring value={progress.percentHours} size={58} /></div>
+    <h2><Link to={`/topics/${topic.slug}`}>{topic.name}</Link></h2><p>{topic.description}</p>
+    <div className="topic-card-hours"><strong>{doneHours.toFixed(1)} / {hours.toFixed(1)} core h</strong><span>{unlocked} unlocked</span></div>
+    {optionalBudget > 0 && <small className="optional-summary">+ {optionalBudget.toFixed(1)} optional h</small>}
+    {next ? <Link className="button secondary small" to={`/task/${next.id}`}>Next · {next.id}</Link> : <Link className="button secondary small" to={`/topics/${topic.slug}`}>Open topic</Link>}
+  </article>
+}
+
+export function ExitGateChecklist({ checks, onToggle }: { checks: Array<{ key: string; label: string; source: 'steps' | 'manual'; complete: boolean; completedSteps: number; totalSteps: number }>; onToggle: (key: string, value: boolean) => void }) {
+  return <div className="exit-gate-list">{checks.map((check) => <label className="exit-gate-item" key={check.key}>
+    {check.source === 'manual' ? <input type="checkbox" checked={check.complete} onChange={(event) => onToggle(check.key, event.target.checked)} /> : <span className={`gate-check${check.complete ? ' complete' : ''}`}>{check.complete && <Check size={12} />}</span>}
+    <span>{check.label}</span>{check.source === 'steps' && <small>{check.completedSteps}/{check.totalSteps}</small>}
+  </label>)}</div>
 }
 
 export function KanbanColumn({ status, tasks }: { status: Status; tasks: Task[] }) {

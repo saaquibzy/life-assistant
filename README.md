@@ -33,9 +33,11 @@ The supplied 186 task rows are loaded from `data/tasks.json`. Each task has a st
 
 Task status is `not_started`, `in_progress`, `done`, or `parked`. A lock is derived from prerequisite completion and is never stored. The persisted store uses schema version 2. When v1 week-based data is found, the app asks you to download a JSON backup before continuing with a fresh plan. Settings imports and exports schema-v2 JSON backups.
 
+Core-hour budgets exclude optional steps; optional work is displayed separately. Phase B provides Dashboard, Tracker, Topics, Phases, Task Detail, and Settings screens. Strict gates are on by default. Timers and swipe mode are not implemented yet.
+
 Run `npm test` to run the Vitest parser, taxonomy, migration, and roadmap tests.
 
-Dashboard, Tracker, Task Detail, and Settings are active v2 screens. Legacy week, project, review, and analytics URLs show a placeholder until their roadmap UI phase.
+The sidebar and mobile navigation use Dashboard, Tracker, Topics, Phases, and Settings. Legacy week, project, review, and analytics routes are no longer part of the app.
 
 ## Optional cross-device sync
 

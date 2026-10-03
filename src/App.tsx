@@ -4,17 +4,21 @@ import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-ro
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { ArrowDownToLine, ArrowUpRight, Check, Command, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, WandSparkles, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Check, Command, Flag, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, Tags, WandSparkles, X } from "lucide-react";
 
 import { useRoadmap } from "./store";
 
-import { PhasePlaceholder, phases, trackClass, taskProgress, PageSkeleton } from "./components/shared";
+import { phases, trackClass, taskProgress, PageSkeleton } from "./components/shared";
 
 
 
 const DashboardPage = lazy(() => import("./pages/Dashboard"));
 const TrackerPage = lazy(() => import("./pages/Tracker"));
 const TaskDetailPage = lazy(() => import("./pages/TaskDetail"));
+const TopicsPage = lazy(() => import("./pages/Topics"));
+const TopicDetailPage = lazy(() => import("./pages/TopicDetail"));
+const PhasesPage = lazy(() => import("./pages/Phases"));
+const PhaseDetailPage = lazy(() => import("./pages/PhaseDetail"));
 const SettingsPageLazy = lazy(() => import("./pages/Settings"));
 const NotFoundPage = lazy(() => import("./pages/NotFound"));
 
@@ -63,7 +67,7 @@ function App() {
         const completed = state.tasks[changedIndex];
         const before = previous.tasks[changedIndex];
         if (!completed || completed.status !== "done" || !before) return;
-        const phaseTasks = state.tasks.filter((task) => task.phase === completed.phase);
+        const phaseTasks = state.tasks.filter((task) => task.phase === completed.phase && !task.optional);
         const milestone = phaseTasks.length && phaseTasks.every((task) => task.status === "done")
           ? `Phase ${completed.phase} · ${phases[completed.phase]} complete`
           : null;
@@ -129,15 +133,13 @@ function App() {
       )
       .slice(0, 6);
   }, [search]);
-  const progress = useRoadmap((state) => taskProgress(state.tasks.filter((task) => task.id !== 'RB-59')));
-  const navGroups = [
-    {
-      label: "Workspace",
-      links: [
-        { to: "/", label: "Overview", icon: LayoutDashboard },
-        { to: "/tracker", label: "Task tracker", icon: ListTodo },
-      ],
-    },
+  const progress = useRoadmap((state) => taskProgress(state.tasks.filter((task) => !task.optional)));
+  const navLinks = [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/tracker', label: 'Tracker', icon: ListTodo },
+    { to: '/topics', label: 'Topics', icon: Tags },
+    { to: '/phases', label: 'Phases', icon: Flag },
+    { to: '/settings', label: 'Settings', icon: Settings },
   ];
   return (
     <div className="app-shell">
@@ -153,12 +155,10 @@ function App() {
         <div className="plan-label">
           <span className="live-dot" /> HOURS-BASED ROADMAP
         </div>
-        {navGroups.map((group) => (
-          <div className="nav-group" key={group.label}>
-            <p>{group.label}</p>
-            {group.links.map(({ to, label, icon: Icon }) => (
+        <div className="nav-group" aria-label="Main navigation">
+            {navLinks.map(({ to, label, icon: Icon }) => (
               <NavLink
-                end={to === "/"}
+                end={to === '/' || to === '/topics' || to === '/phases'}
                 to={to}
                 key={to}
                 className={({ isActive }) =>
@@ -169,12 +169,8 @@ function App() {
                 <span>{label}</span>
               </NavLink>
             ))}
-          </div>
-        ))}
+        </div>
         <div className="side-spacer" />
-        <Link className="settings-link" to="/settings">
-          <Settings size={17} /> Settings
-        </Link>
         <div className="side-progress">
           <div className="side-progress-heading">
             <span>Plan progress</span>
@@ -187,9 +183,9 @@ function App() {
             {
               useRoadmap
                 .getState()
-                .tasks.filter((task) => task.id !== 'RB-59' && task.status === "done").length
+                .tasks.filter((task) => !task.optional && task.status === "done").length
             }{" "}
-              of {useRoadmap.getState().tasks.filter((task) => task.id !== 'RB-59').length} core tasks completed
+              of {useRoadmap.getState().tasks.filter((task) => !task.optional).length} core tasks completed
           </small>
         </div>
         <div className="profile">
@@ -275,13 +271,10 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/tracker" element={<TrackerPage />} />
               <Route path="/task/:id" element={<TaskDetailPage />} />
-              <Route path="/weeks/*" element={<PhasePlaceholder title="Week planner" />} />
-              <Route path="/phases/:id" element={<PhasePlaceholder title="Phase progress" />} />
-              <Route path="/tracks/:name" element={<PhasePlaceholder title="Track progress" />} />
-              <Route path="/projects/*" element={<PhasePlaceholder title="Projects" />} />
-              <Route path="/reviews" element={<PhasePlaceholder title="Weekly reviews" />} />
-              <Route path="/analytics" element={<PhasePlaceholder title="Analytics" />} />
-              <Route path="/resume" element={<PhasePlaceholder title="Resume and links" />} />
+              <Route path="/topics" element={<TopicsPage />} />
+              <Route path="/topics/:slug" element={<TopicDetailPage />} />
+              <Route path="/phases" element={<PhasesPage />} />
+              <Route path="/phases/:id" element={<PhaseDetailPage />} />
               <Route path="/settings" element={<SettingsPageLazy />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
@@ -339,7 +332,8 @@ function App() {
                 <Link to="/tracker" onClick={() => setSearchOpen(false)}>
                   All tasks <kbd>T</kbd>
                 </Link>
-                <Link to="/settings" onClick={() => setSearchOpen(false)}>Settings</Link>
+                <Link to="/topics" onClick={() => setSearchOpen(false)}>Topics</Link>
+                <Link to="/phases" onClick={() => setSearchOpen(false)}>Phases</Link>
               </div>
             )}
           </section>
@@ -402,9 +396,11 @@ function MobileNav() {
   return (
     <nav className="mobile-nav">
       {[
-        { to: "/", label: "Home", icon: LayoutDashboard },
-        { to: "/tracker", label: "Tasks", icon: ListTodo },
-        { to: "/settings", label: "Setup", icon: Settings },
+        { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/tracker', label: 'Tracker', icon: ListTodo },
+        { to: '/topics', label: 'Topics', icon: Tags },
+        { to: '/phases', label: 'Phases', icon: Flag },
+        { to: '/settings', label: 'Settings', icon: Settings },
       ].map(({ to, label, icon: Icon }) => (
         <NavLink
           end={to === "/"}

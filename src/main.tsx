@@ -5,6 +5,7 @@ import App from './App'
 import { SyncProvider } from './SyncProvider'
 import './styles.css'
 import './dashboard.css'
+import './components/topicFirst.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

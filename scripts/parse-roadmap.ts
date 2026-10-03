@@ -19,6 +19,7 @@ const topicCatalog = [
   { slug: 'videos', name: 'Videos', code: 'VD', color: '#f472b6', icon: 'video', description: 'Editing, recording, reels, and social storytelling for projects.' },
   { slug: 'resume-and-jobs', name: 'Resume and Jobs', code: 'JB', color: '#60a5fa', icon: 'briefcase', description: 'Profiles, resumes, job applications, and interview prep.' },
 ]
+const phaseNames = ['Setup', 'Foundations', 'Core Builds', 'Research Flagship', 'LLMs and Deploy', 'Finish']
 
 export function parseTableRow(raw: string): string[] {
   const cells: string[] = []
@@ -58,10 +59,26 @@ function normalizeTrackCode(raw: string): RoadmapTask['trackCode'] {
   return ['ML', 'RB', 'DW', 'VD', 'JB'].includes(code) ? code : 'ML'
 }
 
-function detectTopicFromId(taskId: string): string {
+function detectTopicFromTask(taskId: string, step: string, group: string): string {
   const code = taskId.split('-')[0]?.toUpperCase() ?? 'ML'
-  const found = topicCatalog.find((item) => item.code === code)
-  return found?.name ?? 'General'
+  if (code === 'RB') return 'Robotics'
+  if (code === 'VD') return 'Videos'
+  if (code === 'JB') return 'Resume and Jobs'
+  if (code === 'DW') {
+    if (taskId === 'DW-01' || taskId === 'DW-02') return 'GitHub Polishing'
+    if (/design|figma|style guide|moodboard|color palette|font pair|type scale|wireframe/i.test(step) || /design the portfolio in figma/i.test(group)) return 'Design'
+    return 'Portfolio Website'
+  }
+  return 'AI/ML'
+}
+
+function groupFromHeading(line: string, phase: number): string | null {
+  const heading = line.replace(/^##\s+/, '')
+  const trackHeading = heading.match(/^(AI\/ML|Robotics|Design\/Web|Video(?:\/Social)?|Resume\/Jobs(?:\/Interview)?)(?=\s|\(|:|$)/i)
+  if (!trackHeading) return null
+  const description = heading.slice(trackHeading[0].length).trim().replace(/^\([^)]*\)\s*/, '').replace(/^:\s*/, '')
+  if (!description) return `${phaseNames[phase] ?? `Phase ${phase}`} work`
+  return description[0].toUpperCase() + description.slice(1)
 }
 
 export function parseRoadmapMarkdown(markdown: string) {
@@ -70,6 +87,7 @@ export function parseRoadmapMarkdown(markdown: string) {
   const phaseGates: Record<number, string> = {}
   const cutOrder: string[] = []
   let currentPhase: number | null = null
+  let currentGroup = 'Setup'
   let inTable = false
   let currentTableHeaders: string[] = []
   let currentTableType: 'tasks' | 'summary' | null = null
@@ -80,8 +98,16 @@ export function parseRoadmapMarkdown(markdown: string) {
     const phaseMatch = line.match(/^#+\s*Phase\s+(\d+)/i)
     if (phaseMatch) {
       currentPhase = Number(phaseMatch[1])
+      currentGroup = phaseNames[currentPhase] ?? `Phase ${currentPhase}`
       inTable = false
       currentTableType = null
+      continue
+    }
+
+    const inlineGate = line.match(/^\*\*(?:Phase\s+(\d+)|Final)\s+exit\s+gate:\*\*\s*(.*)$/i)
+    if (inlineGate) {
+      const phase = inlineGate[1] ? Number(inlineGate[1]) : 5
+      phaseGates[phase] = inlineGate[2].trim()
       continue
     }
 
@@ -97,12 +123,22 @@ export function parseRoadmapMarkdown(markdown: string) {
     }
 
     if (/^#+\s*Cut\s+order/i.test(line)) {
+      let foundOrder = false
       for (let j = index + 1; j < lines.length; j += 1) {
         const next = lines[j].trim()
-        if (!next || /^#+\s+/.test(next)) break
-        if (next.startsWith('- ') || next.startsWith('* ')) cutOrder.push(next.replace(/^[-*]\s*/, ''))
+        if (/^#+\s+/.test(next) || /^\*\*Never cut:/i.test(next)) break
+        if (!next) {
+          if (foundOrder) break
+          continue
+        }
+        cutOrder.push(...next.split(/\s*(?:→|->)\s*/).map((item) => item.replace(/^[-*]\s*/, '').trim()).filter(Boolean))
+        foundOrder = true
       }
       continue
+    }
+
+    if (currentPhase !== null && line.startsWith('## ')) {
+      currentGroup = groupFromHeading(line, currentPhase) ?? currentGroup
     }
 
     if (line.startsWith('|')) {
@@ -130,6 +166,8 @@ export function parseRoadmapMarkdown(markdown: string) {
         const needs = normalizeNeeds(normalized.needs ?? 'none')
         const step = String(normalized.step ?? normalized.task ?? '').trim()
         const optional = /opt|optional/i.test(String(normalized.optional ?? '')) || /^\(opt\)/i.test(step)
+        const group = String(normalized.group ?? currentGroup).trim()
+        const topic = String(normalized.topic ?? detectTopicFromTask(id.toUpperCase(), step, group)).trim()
         const task: RoadmapTask = {
           id: id.toUpperCase(),
           trackCode: normalizeTrackCode(id),
@@ -140,8 +178,8 @@ export function parseRoadmapMarkdown(markdown: string) {
           needs,
           doneWhen: String(normalized['done when'] ?? normalized.donewhen ?? '').trim(),
           optional,
-          topic: String(normalized.topic ?? detectTopicFromId(id)).trim() || detectTopicFromId(id),
-          group: String(normalized.group ?? 'general').trim() || 'general',
+          topic: topic || detectTopicFromTask(id.toUpperCase(), step, group),
+          group: group || currentGroup,
           status: 'not_started',
           doneAt: '',
           notes: '',
@@ -209,7 +247,7 @@ function ensureOutputs(tasks: RoadmapTask[], phaseGates: Record<number, string>,
   fs.mkdirSync(outDir, { recursive: true })
   fs.writeFileSync(path.join(outDir, 'tasks.json'), JSON.stringify(tasks, null, 2) + '\n')
   fs.writeFileSync(path.join(outDir, 'phases.json'), JSON.stringify(
-    Object.entries(phaseGates).map(([phase, gate]) => ({ phase: Number(phase), gate })),
+    Object.entries(phaseGates).map(([phase, gate]) => ({ phase: Number(phase), name: phaseNames[Number(phase)], gate })),
     null,
     2,
   ) + '\n')

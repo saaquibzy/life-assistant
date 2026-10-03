@@ -1,55 +1,64 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { DndContext, type DragEndEvent } from '@dnd-kit/core'
-import { Download, FolderKanban, ListTodo, Search, Table2, X } from 'lucide-react'
-import { type Status, useRoadmap } from '../store'
-import { coreHours, isUnlocked, optionalHours } from '../lib/roadmap'
-import { KanbanColumn, PageTitle, StatusPill, TaskRow, phases } from '../components/shared'
-
-const statuses: Status[] = ['not_started', 'in_progress', 'done', 'parked']
+import { useSearchParams } from 'react-router-dom'
+import { Search } from 'lucide-react'
+import { coreHours, filterRoadmapTasks, isUnlocked, optionalHours, readRoadmapFilters, selectNextUnlockedInGroup, writeRoadmapFilters, type RoadmapFilters } from '../lib/roadmap'
+import { useRoadmap } from '../store'
+import { EmptyState, PageTitle, ProgressBar, TaskStepItem, topics, taskProgress } from '../components/shared'
 
 function Tracker() {
   const tasks = useRoadmap((state) => state.tasks)
-  const updateMany = useRoadmap((state) => state.updateMany)
   const [params, setParams] = useSearchParams()
-  const [view, setView] = useState<'list' | 'kanban' | 'table'>('list')
-  const [selected, setSelected] = useState<string[]>([])
-  const query = params.get('q') ?? ''
-  const topic = params.get('topic') ?? ''
-  const phase = params.get('phase') ?? ''
-  const status = params.get('status') ?? ''
-  const filtered = tasks.filter((task) =>
-    (!query || `${task.id} ${task.step} ${task.topic}`.toLowerCase().includes(query.toLowerCase())) &&
-    (!topic || task.topic === topic) &&
-    (!phase || task.phase === Number(phase)) &&
-    (!status || task.status === status))
-  const setFilter = (key: string, value: string) => {
-    const next = new URLSearchParams(params)
-    value ? next.set(key, value) : next.delete(key)
-    setParams(next, { replace: true })
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({})
+  const filters = readRoadmapFilters(params)
+  const filtered = filterRoadmapTasks(tasks, filters)
+  const setFilter = <Key extends keyof RoadmapFilters>(key: Key, value: RoadmapFilters[Key]) => {
+    setParams((current) => writeRoadmapFilters({ ...readRoadmapFilters(current), [key]: value }), { replace: true })
   }
-  const grouped = Object.fromEntries(statuses.map((item) => [item, filtered.filter((task) => task.status === item)])) as Record<Status, typeof tasks>
+
   return <>
-    <PageTitle eyebrow="HOURS-BASED PLAN" title="Task tracker" subtitle={`${filtered.length} tasks · ${coreHours(filtered).toFixed(1)} core h${optionalHours(filtered) ? ` + ${optionalHours(filtered).toFixed(1)} optional h` : ''}`} action={<button className="button secondary" onClick={() => {
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(new Blob([JSON.stringify({ schemaVersion: 2, tasks }, null, 2)], { type: 'application/json' }))
-      link.download = 'roadmap-tasks-v2.json'
-      link.click()
-      URL.revokeObjectURL(link.href)
-    }}><Download size={15} /> Export</button>} />
-    <section className="panel filter-panel">
-      <div className="tracker-search"><Search size={16} /><input value={query} onChange={(event) => setFilter('q', event.target.value)} placeholder="Search tasks, topics, IDs..." /></div>
-      <select value={topic} onChange={(event) => setFilter('topic', event.target.value)}><option value="">All topics</option>{[...new Set(tasks.map((task) => task.topic))].sort().map((item) => <option key={item}>{item}</option>)}</select>
-      <select value={phase} onChange={(event) => setFilter('phase', event.target.value)}><option value="">All phases</option>{phases.map((item, index) => <option value={index} key={item}>Phase {index} · {item}</option>)}</select>
-      <select value={status} onChange={(event) => setFilter('status', event.target.value)}><option value="">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}</select>
-      <div className="view-switch">{([{ id: 'list', icon: ListTodo }, { id: 'kanban', icon: FolderKanban }, { id: 'table', icon: Table2 }] as const).map(({ id, icon: Icon }) => <button className={view === id ? 'selected' : ''} onClick={() => setView(id)} key={id} aria-label={`${id} view`}><Icon size={16} /></button>)}</div>
+    <PageTitle eyebrow="ALL ROADMAP STEPS" title="Tracker" subtitle={`${filtered.length} matching steps · ${coreHours(filtered).toFixed(1)} core h${optionalHours(filtered) ? ` · ${optionalHours(filtered).toFixed(1)} optional h` : ''}`} />
+    <section className="panel filter-panel topic-filter-panel">
+      <label className="tracker-search"><Search size={15} /><input value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Search ID, step, topic, group" /></label>
+      <label className="filter-control">Topic<select value={filters.topic} onChange={(event) => setFilter('topic', event.target.value)}><option value="">All topics</option>{topics.map((topic) => <option key={topic.slug} value={topic.name}>{topic.name}</option>)}</select></label>
+      <label className="filter-control">Phase<select value={filters.phase} onChange={(event) => setFilter('phase', event.target.value)}><option value="">All phases</option>{Array.from({ length: 6 }, (_, phase) => <option key={phase} value={String(phase)}>Phase {phase}</option>)}</select></label>
+      <label className="filter-control">Status<select value={filters.status} onChange={(event) => setFilter('status', event.target.value)}><option value="">All statuses</option>{['not_started', 'in_progress', 'done', 'parked'].map((status) => <option key={status} value={status}>{status.replace('_', ' ')}</option>)}</select></label>
+      <label className="filter-control">Optional<select value={filters.optional} onChange={(event) => setFilter('optional', event.target.value as RoadmapFilters['optional'])}><option value="core">Core only</option><option value="optional">Optional only</option><option value="all">Core + optional</option></select></label>
+      <label className="filter-control">Lock<select value={filters.locked} onChange={(event) => setFilter('locked', event.target.value as RoadmapFilters['locked'])}><option value="all">All steps</option><option value="unlocked">Unlocked</option><option value="locked">Locked</option></select></label>
     </section>
-    {selected.length > 0 && <div className="bulk-bar"><span>{selected.length} selected</span><select id="bulk-status">{statuses.map((item) => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}</select><button className="button primary small" onClick={() => { updateMany(selected, (document.querySelector('#bulk-status') as HTMLSelectElement).value as Status); setSelected([]) }}>Apply status</button><button className="icon-button" onClick={() => setSelected([])} aria-label="Clear selection"><X size={15} /></button></div>}
-    {view === 'list' ? <div className="panel task-list-panel">{filtered.map((task) => <div className="selectable-task" key={task.id}><input type="checkbox" checked={selected.includes(task.id)} onChange={(event) => setSelected(event.target.checked ? [...selected, task.id] : selected.filter((id) => id !== task.id))} aria-label={`Select ${task.id}`} /><TaskRow task={task} /></div>)}</div> : view === 'table' ? <div className="panel table-scroll"><table className="task-table"><thead><tr><th></th><th>ID</th><th>Step</th><th>Topic</th><th>Phase</th><th>Hours</th><th>Status</th></tr></thead><tbody>{filtered.map((task) => <tr key={task.id}><td><input type="checkbox" checked={selected.includes(task.id)} onChange={(event) => setSelected(event.target.checked ? [...selected, task.id] : selected.filter((id) => id !== task.id))} /></td><td className="mono">{task.id}</td><td><Link to={`/task/${task.id}`}>{task.step}</Link></td><td>{task.topic}</td><td>{task.phase}</td><td>{task.budgetHours}</td><td><StatusPill status={task.status} disabled={!isUnlocked(task, { tasks })} /></td></tr>)}</tbody></table></div> : <DndContext onDragEnd={(event: DragEndEvent) => {
-      const id = String(event.active.id)
-      const nextStatus = String(event.over?.id ?? '') as Status
-      if (statuses.includes(nextStatus)) updateMany([id], nextStatus)
-    }}><div className="kanban-grid">{statuses.map((column) => <KanbanColumn key={column} status={column} tasks={grouped[column]} />)}</div></DndContext>}
+    {topics.map((topic) => {
+      const topicMatches = filtered.filter((task) => task.topic === topic.name)
+      if (topicMatches.length === 0) return null
+      const topicTasks = tasks.filter((task) => task.topic === topic.name)
+      const core = topicTasks.filter((task) => !task.optional)
+      const topicPercent = taskProgress(core)
+      return <details className="topic-accordion" key={topic.slug}>
+        <summary className="topic-accordion-summary"><span className="topic-summary-mark" style={{ backgroundColor: topic.color }}>{topic.code}</span><span className="topic-summary-name">{topic.name}<small>{topicMatches.length} matching steps</small></span><ProgressBar value={topicPercent} /><span className="topic-summary-progress">{topicPercent}%</span><span className="accordion-chevron" /></summary>
+        <div className="topic-group-list">{topic.groups.map((group) => {
+          const key = `${topic.slug}:${group.name}`
+          const groupTasks = topicTasks.filter((task) => task.group === group.name)
+          const matchingGroup = topicMatches.filter((task) => task.group === group.name)
+          if (!matchingGroup.length) return null
+          const groupCore = groupTasks.filter((task) => !task.optional)
+          const groupPercent = taskProgress(groupCore)
+          const selectable = filters.optional === 'optional' ? groupTasks.filter((task) => task.optional) : groupTasks
+          const next = selectNextUnlockedInGroup(selectable, topic.name, group.name, 3, filters.optional === 'all', tasks)
+          const nextIds = new Set(next.map((task) => task.id))
+          const alwaysVisible = matchingGroup.filter((task) => !isUnlocked(task, { tasks }) || task.status === 'parked')
+          const visible = showAll[key] ? matchingGroup : [
+            ...matchingGroup.filter((task) => nextIds.has(task.id)),
+            ...alwaysVisible.filter((task) => !nextIds.has(task.id)),
+          ]
+          return <details className="group-accordion" key={group.name}>
+            <summary className="group-accordion-summary"><span className="group-name">{group.name}</span><ProgressBar value={groupPercent} /><small>{groupPercent}% · {groupCore.filter((task) => task.status === 'done').length}/{groupCore.length} core</small><span className="accordion-chevron" /></summary>
+            <div className="group-step-list">{visible.length ? visible.map((task) => <TaskStepItem key={task.id} task={task} tasks={tasks} />) : <EmptyState title="No matching steps" text="Change a filter to show steps in this group." />}
+              {!showAll[key] && visible.length < matchingGroup.length && <button className="show-all-button" onClick={() => setShowAll((current) => ({ ...current, [key]: true }))}>Show all {matchingGroup.length} steps</button>}
+              {showAll[key] && <button className="show-all-button" onClick={() => setShowAll((current) => ({ ...current, [key]: false }))}>Show next unlocked + locked</button>}
+            </div>
+          </details>
+        })}</div>
+      </details>
+    })}
+    {filtered.length === 0 && <div className="panel"><EmptyState title="No steps match" text="Adjust or clear the URL-backed filters." /></div>}
   </>
 }
 

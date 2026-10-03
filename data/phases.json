@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "phase": 0,
+    "name": "Setup",
+    "gate": "resume v0, tracker live, GitHub cleaned, Ubuntu 24.04 + ROS 2 working, placeholder site live."
+  },
+  {
+    "phase": 1,
+    "name": "Foundations",
+    "gate": "ML mini-project written up. R1 works end to end with README. Figma design done. First post live."
+  },
+  {
+    "phase": 2,
+    "name": "Core Builds",
+    "gate": "site live. Resume v1 done. First applications sent. You've trained MNIST, a CNN and a transfer-learning model. R2 completes a waypoint route."
+  },
+  {
+    "phase": 3,
+    "name": "Research Flagship",
+    "gate": "thermal report in the repo. R2 published with metrics. Resume v2 reviewed. 15+ applications sent."
+  },
+  {
+    "phase": 4,
+    "name": "LLMs and Deploy",
+    "gate": "public deployed demo. RAG metrics table. Resume v3 (2 versions). 30+ applications sent in total."
+  },
+  {
+    "phase": 5,
+    "name": "Finish",
+    "gate": "site live and fast, showreel pinned. 5 projects with README, demo and metrics (R1, R2, thermal, RAG/deployed model, R3). Resume (2 versions), LinkedIn and GitHub aligned. 50+ applications sent, with a log of replies."
+  }
+]
