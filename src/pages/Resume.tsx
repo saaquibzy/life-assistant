@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Check, Github } from "lucide-react";
 import { useRoadmap } from "../store";
@@ -8,17 +8,22 @@ function Resume() {
   const tasks = useRoadmap((state) =>
     state.tasks.filter((task) => task.track === "Resume"),
   );
-  const [checks, setChecks] = useState<Record<string, boolean>>(() => {
+  const checks = useRoadmap((state) => state.resumeChecks);
+  const setResumeCheck = useRoadmap((state) => state.setResumeCheck);
+  useEffect(() => {
+    if (Object.keys(checks).length) return;
     try {
-      return JSON.parse(localStorage.getItem("roadmap-resume-checks") ?? "{}");
+      const legacy = JSON.parse(localStorage.getItem("roadmap-resume-checks") ?? "{}");
+      for (const [id, value] of Object.entries(legacy)) {
+        if (typeof value === "boolean") setResumeCheck(id, value);
+      }
+      localStorage.removeItem("roadmap-resume-checks");
     } catch {
-      return {};
+      localStorage.removeItem("roadmap-resume-checks");
     }
-  });
+  }, []);
   const setCheck = (id: string, value: boolean) => {
-    const next = { ...checks, [id]: value };
-    setChecks(next);
-    localStorage.setItem("roadmap-resume-checks", JSON.stringify(next));
+    setResumeCheck(id, value);
   };
   const items = [
     "LinkedIn headline and about section refreshed",

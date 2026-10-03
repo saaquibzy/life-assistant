@@ -3,6 +3,7 @@ import { ArrowDownToLine, ChevronDown, Download, Moon, Sun, Table2 } from "lucid
 import { type Task, useRoadmap } from "../store";
 import { exportTasksCsv, importTasksCsv } from "../taskCsv";
 import { PageTitle, Panel } from "../components/shared";
+import { useSync } from "../SyncProvider";
 
 function SettingsPage() {
   const theme = useRoadmap((state) => state.theme);
@@ -10,6 +11,8 @@ function SettingsPage() {
   const paused = useRoadmap((state) => state.pausedWeeks);
   const state = useRoadmap();
   const [message, setMessage] = useState("");
+  const [syncEmail, setSyncEmail] = useState("");
+  const sync = useSync();
   const exportData = () => {
     const blob = new Blob(
       [
@@ -21,6 +24,7 @@ function SettingsPage() {
             startDate,
             pausedWeeks: paused,
             projectLinks: state.projectLinks,
+            resumeChecks: state.resumeChecks,
           },
           null,
           2,
@@ -126,6 +130,46 @@ function SettingsPage() {
             Adding or removing paused weeks shifts the plan start date and every
             derived week and finish-date calculation by the same amount.
           </p>
+        </Panel>
+        <Panel title="Cross-device sync">
+          <div className="setting-row">
+            <div>
+              <strong>{sync.email ? `Signed in as ${sync.email}` : "Signed out"}</strong>
+              <small>{sync.configured ? sync.status : "Supabase is not configured"}</small>
+            </div>
+            <span className={`tag ${sync.status === "Synced" ? "green-tag" : "muted-tag"}`}>
+              {sync.status}
+            </span>
+          </div>
+          {!sync.configured ? (
+            <p className="setting-hint">Add the Supabase environment variables to enable optional sync.</p>
+          ) : sync.email ? (
+            <div className="settings-actions">
+              {(sync.status === "Error" || sync.status === "Offline") && (
+                <button className="button secondary" disabled={!navigator.onLine} onClick={() => void sync.retry()}>
+                  Retry sync
+                </button>
+              )}
+              <button className="button secondary" onClick={() => void sync.signOut().catch(() => {})}>
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <>
+              <label className="field-label">
+                Email
+                <input type="email" value={syncEmail} onChange={(event) => setSyncEmail(event.target.value)} />
+              </label>
+              <button
+                className="button secondary"
+                disabled={!syncEmail.trim() || sync.status === "Syncing"}
+                onClick={() => void sync.signIn(syncEmail.trim()).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Could not send sign-in link."))}
+              >
+                Send magic link
+              </button>
+            </>
+          )}
+          {sync.message && <p className="setting-hint">{sync.message}</p>}
         </Panel>
         <Panel title="Data portability">
           <p className="muted">
