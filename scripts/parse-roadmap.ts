@@ -128,12 +128,13 @@ export function parseRoadmapMarkdown(markdown: string) {
       if (currentTableType === 'tasks') {
         const { hours, note } = parseHours(String(normalized.hours ?? normalized['budget hours'] ?? '0'))
         const needs = normalizeNeeds(normalized.needs ?? 'none')
-        const optional = /opt|optional/i.test(String(normalized.optional ?? ''))
+        const step = String(normalized.step ?? normalized.task ?? '').trim()
+        const optional = /opt|optional/i.test(String(normalized.optional ?? '')) || /^\(opt\)/i.test(step)
         const task: RoadmapTask = {
           id: id.toUpperCase(),
           trackCode: normalizeTrackCode(id),
           phase: currentPhase,
-          step: String(normalized.step ?? normalized.task ?? '').trim(),
+          step,
           budgetHours: hours,
           hoursNote: note || String(normalized.hours ?? normalized['budget hours'] ?? '').trim(),
           needs,
@@ -193,6 +194,17 @@ function validateTasks(tasks: RoadmapTask[]) {
   return { duplicates, missingNeeds }
 }
 
+function buildTopicCatalog(tasks: RoadmapTask[]) {
+  return topicCatalog.map((topic) => {
+    const topicTasks = tasks.filter((task) => task.topic === topic.name)
+    const groups = [...new Set(topicTasks.map((task) => task.group))].map((name) => ({
+      name,
+      taskIds: topicTasks.filter((task) => task.group === name).map((task) => task.id),
+    }))
+    return { ...topic, groups }
+  })
+}
+
 function ensureOutputs(tasks: RoadmapTask[], phaseGates: Record<number, string>, cutOrder: string[]) {
   fs.mkdirSync(outDir, { recursive: true })
   fs.writeFileSync(path.join(outDir, 'tasks.json'), JSON.stringify(tasks, null, 2) + '\n')
@@ -202,7 +214,7 @@ function ensureOutputs(tasks: RoadmapTask[], phaseGates: Record<number, string>,
     2,
   ) + '\n')
   fs.writeFileSync(path.join(outDir, 'cut-order.json'), JSON.stringify(cutOrder, null, 2) + '\n')
-  fs.writeFileSync(path.join(outDir, 'topics.json'), JSON.stringify(topicCatalog, null, 2) + '\n')
+  fs.writeFileSync(path.join(outDir, 'topics.json'), JSON.stringify(buildTopicCatalog(tasks), null, 2) + '\n')
 }
 
 function main() {

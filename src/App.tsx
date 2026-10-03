@@ -4,26 +4,17 @@ import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-ro
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { Activity, ArrowUpRight, Check, CheckCheck, Command, FolderKanban, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, Target, Timer, WandSparkles, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Check, Command, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, WandSparkles, X } from "lucide-react";
 
-import { type Task, useRoadmap } from "./store";
+import { useRoadmap } from "./store";
 
-import { trackClass, taskProgress, prettyWeek, PageSkeleton } from "./components/shared";
+import { PhasePlaceholder, phases, trackClass, taskProgress, PageSkeleton } from "./components/shared";
 
 
 
 const DashboardPage = lazy(() => import("./pages/Dashboard"));
 const TrackerPage = lazy(() => import("./pages/Tracker"));
 const TaskDetailPage = lazy(() => import("./pages/TaskDetail"));
-const WeeksPage = lazy(() => import("./pages/Weeks"));
-const WeekDetailPage = lazy(() => import("./pages/WeekDetail"));
-const PhasePageLazy = lazy(() => import("./pages/Phase"));
-const TrackPageLazy = lazy(() => import("./pages/Track"));
-const ProjectsPage = lazy(() => import("./pages/Projects"));
-const ProjectDetailPage = lazy(() => import("./pages/ProjectDetail"));
-const ReviewsPage = lazy(() => import("./pages/Reviews"));
-const AnalyticsPage = lazy(() => import("./pages/Analytics"));
-const ResumePage = lazy(() => import("./pages/Resume"));
 const SettingsPageLazy = lazy(() => import("./pages/Settings"));
 const NotFoundPage = lazy(() => import("./pages/NotFound"));
 
@@ -31,6 +22,9 @@ const NotFoundPage = lazy(() => import("./pages/NotFound"));
 
 function App() {
   const theme = useRoadmap((state) => state.theme);
+  const migrationBackup = useRoadmap((state) => state.migrationBackup);
+  const [backupDownloaded, setBackupDownloaded] = useState(false);
+  const [backupUrl, setBackupUrl] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<{
@@ -47,6 +41,16 @@ function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   useEffect(() => {
+    if (!migrationBackup) {
+      setBackupUrl('');
+      setBackupDownloaded(false);
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([migrationBackup], { type: 'application/json' }));
+    setBackupUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [migrationBackup]);
+  useEffect(() => {
     localStorage.setItem("roadmap-sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
   useEffect(
@@ -58,31 +62,11 @@ function App() {
         );
         const completed = state.tasks[changedIndex];
         const before = previous.tasks[changedIndex];
-        if (!completed || completed.status !== "Done" || !before) return;
-        const groups = [
-          [
-            `${prettyWeek(completed.week)} complete`,
-            (task: Task) => task.week === completed.week,
-          ],
-          [
-            `${completed.project} complete`,
-            (task: Task) => task.project === completed.project,
-          ],
-          [
-            `Phase ${completed.phase} complete`,
-            (task: Task) => task.phase === completed.phase,
-          ],
-        ] as const;
-        const milestone = groups.find(
-          ([, matches]) =>
-            state.tasks.some(matches) &&
-            state.tasks
-              .filter(matches)
-              .every((task) => task.status === "Done") &&
-            !previous.tasks
-              .filter(matches)
-              .every((task) => task.status === "Done"),
-        )?.[0];
+        if (!completed || completed.status !== "done" || !before) return;
+        const phaseTasks = state.tasks.filter((task) => task.phase === completed.phase);
+        const milestone = phaseTasks.length && phaseTasks.every((task) => task.status === "done")
+          ? `Phase ${completed.phase} · ${phases[completed.phase]} complete`
+          : null;
         setToast({
           message: milestone ?? "Task marked done",
           undo: () =>
@@ -90,7 +74,7 @@ function App() {
               .getState()
               .updateTask(completed.id, {
                 status: before.status,
-                dateDone: before.dateDone,
+                doneAt: before.doneAt,
               }),
         });
         window.setTimeout(() => setToast(null), 5000);
@@ -125,11 +109,7 @@ function App() {
           window.sessionStorage.setItem("roadmap-nav-key", "g");
         else if (window.sessionStorage.getItem("roadmap-nav-key") === "g") {
           window.sessionStorage.removeItem("roadmap-nav-key");
-          const routes: Record<string, string> = {
-            d: "/",
-            t: "/tracker",
-            w: "/weeks",
-          };
+          const routes: Record<string, string> = { d: "/", t: "/tracker" };
           if (routes[event.key]) navigate(routes[event.key]);
         }
       }
@@ -143,29 +123,19 @@ function App() {
     return useRoadmap
       .getState()
       .tasks.filter((task) =>
-        `${task.id} ${task.topic} ${task.project} ${task.track}`
+        `${task.id} ${task.topic} ${task.step}`
           .toLowerCase()
           .includes(normalized),
       )
       .slice(0, 6);
   }, [search]);
-  const progress = useRoadmap((state) => taskProgress(state.tasks));
+  const progress = useRoadmap((state) => taskProgress(state.tasks.filter((task) => task.id !== 'RB-59')));
   const navGroups = [
     {
       label: "Workspace",
       links: [
         { to: "/", label: "Overview", icon: LayoutDashboard },
         { to: "/tracker", label: "Task tracker", icon: ListTodo },
-        { to: "/weeks", label: "Week planner", icon: Timer },
-        { to: "/projects", label: "Projects", icon: FolderKanban },
-      ],
-    },
-    {
-      label: "Insights",
-      links: [
-        { to: "/reviews", label: "Weekly reviews", icon: CheckCheck },
-        { to: "/analytics", label: "Analytics", icon: Activity },
-        { to: "/resume", label: "Resume & links", icon: Target },
       ],
     },
   ];
@@ -177,11 +147,11 @@ function App() {
             <WandSparkles size={18} />
           </span>
           <span>
-            ROUTE<span className="brand-muted">/24</span>
+            ROUTE<span className="brand-muted">/HRS</span>
           </span>
         </Link>
         <div className="plan-label">
-          <span className="live-dot" /> YOUR 24-WEEK PLAN
+          <span className="live-dot" /> HOURS-BASED ROADMAP
         </div>
         {navGroups.map((group) => (
           <div className="nav-group" key={group.label}>
@@ -217,9 +187,9 @@ function App() {
             {
               useRoadmap
                 .getState()
-                .tasks.filter((task) => task.status === "Done").length
+                .tasks.filter((task) => task.id !== 'RB-59' && task.status === "done").length
             }{" "}
-            of {useRoadmap.getState().tasks.length} tasks completed
+              of {useRoadmap.getState().tasks.filter((task) => task.id !== 'RB-59').length} core tasks completed
           </small>
         </div>
         <div className="profile">
@@ -239,7 +209,7 @@ function App() {
             <span className="brand-mark">
               <WandSparkles size={17} />
             </span>
-            ROUTE<span className="brand-muted">/24</span>
+            ROUTE<span className="brand-muted">/HRS</span>
           </div>
           <div className="breadcrumbs">
             <span>Workspace</span>
@@ -305,15 +275,13 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/tracker" element={<TrackerPage />} />
               <Route path="/task/:id" element={<TaskDetailPage />} />
-              <Route path="/weeks" element={<WeeksPage />} />
-              <Route path="/weeks/:n" element={<WeekDetailPage />} />
-              <Route path="/phases/:id" element={<PhasePageLazy />} />
-              <Route path="/tracks/:name" element={<TrackPageLazy />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:slug" element={<ProjectDetailPage />} />
-              <Route path="/reviews" element={<ReviewsPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/resume" element={<ResumePage />} />
+              <Route path="/weeks/*" element={<PhasePlaceholder title="Week planner" />} />
+              <Route path="/phases/:id" element={<PhasePlaceholder title="Phase progress" />} />
+              <Route path="/tracks/:name" element={<PhasePlaceholder title="Track progress" />} />
+              <Route path="/projects/*" element={<PhasePlaceholder title="Projects" />} />
+              <Route path="/reviews" element={<PhasePlaceholder title="Weekly reviews" />} />
+              <Route path="/analytics" element={<PhasePlaceholder title="Analytics" />} />
+              <Route path="/resume" element={<PhasePlaceholder title="Resume and links" />} />
               <Route path="/settings" element={<SettingsPageLazy />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
@@ -349,11 +317,11 @@ function App() {
                       to={`/task/${task.id}`}
                       onClick={() => setSearchOpen(false)}
                     >
-                      <span className={`track-dot ${trackClass[task.track]}`} />
+                      <span className={`track-dot ${trackClass[task.trackCode]}`} />
                       <span>
                         {task.topic}
                         <small>
-                          {task.project} · W{String(task.week).padStart(2, "0")}
+                          {task.id} · Phase {task.phase} · {task.budgetHours} h
                         </small>
                       </span>
                       <ArrowUpRight size={15} />
@@ -371,12 +339,7 @@ function App() {
                 <Link to="/tracker" onClick={() => setSearchOpen(false)}>
                   All tasks <kbd>T</kbd>
                 </Link>
-                <Link to="/weeks" onClick={() => setSearchOpen(false)}>
-                  Week planner <kbd>W</kbd>
-                </Link>
-                <Link to="/analytics" onClick={() => setSearchOpen(false)}>
-                  Analytics <kbd>A</kbd>
-                </Link>
+                <Link to="/settings" onClick={() => setSearchOpen(false)}>Settings</Link>
               </div>
             )}
           </section>
@@ -412,6 +375,17 @@ function App() {
           </button>
         </div>
       )}
+      {migrationBackup && (
+        <div className="command-backdrop migration-backdrop">
+          <section className="command-box migration-prompt" role="alertdialog" aria-modal="true" aria-labelledby="migration-title">
+            <span className="eyebrow">SCHEMA UPDATE</span>
+            <h2 id="migration-title">Your saved roadmap uses the old week-based format.</h2>
+            <p>Download a JSON backup of that data, then continue with the fresh hours-based roadmap.</p>
+            <a className="button secondary" href={backupUrl} download="roadmap-v1-backup.json" onClick={() => setBackupDownloaded(true)}><ArrowDownToLine size={15} /> Download JSON backup</a>
+            <button className="button primary" disabled={!backupDownloaded} onClick={() => useRoadmap.getState().clearMigrationBackup()}>Start fresh</button>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -430,8 +404,6 @@ function MobileNav() {
       {[
         { to: "/", label: "Home", icon: LayoutDashboard },
         { to: "/tracker", label: "Tasks", icon: ListTodo },
-        { to: "/weeks", label: "Weeks", icon: Timer },
-        { to: "/analytics", label: "Stats", icon: Activity },
         { to: "/settings", label: "Setup", icon: Settings },
       ].map(({ to, label, icon: Icon }) => (
         <NavLink

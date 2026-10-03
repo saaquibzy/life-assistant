@@ -1,6 +1,6 @@
-# 24-Week Roadmap Tracker
+# Hours-Based Roadmap Tracker
 
-A responsive, multi-page roadmap for robotics and AI/ML work. Tasks are loaded from `data/tasks.json`; editable status, notes, dates, reviews, and links are persisted in this browser with Zustand and can optionally sync through Supabase.
+A responsive tracker for robotics and AI/ML work. Tasks are loaded from `data/tasks.json`; v2 task status and evidence are persisted in this browser with Zustand.
 
 ## Hours-based roadmap layer
 
@@ -8,7 +8,7 @@ The repo now includes a data-planning layer for the new roadmap-by-hours model:
 
 - `scripts/parse-roadmap.ts` reads `docs/Roadmap_by_Hours.md` and writes `data/tasks.json`, `data/phases.json`, `data/cut-order.json`, and `data/topics.json`.
 - `src/lib/roadmap.ts` contains the pure gate logic for `isUnlocked`, `nextUnlocked`, progress tracking, dependency-cycle checks, and swipe resolution.
-- The parser validates unique IDs, missing dependencies, cycles, orphaned topic/group assignments, and optional summary-hour checks.
+- The parser validates unique IDs, missing dependencies, and cycles. Vitest verifies exact topic/group coverage against `data/topics.json`.
 
 Run the parser with:
 
@@ -29,37 +29,19 @@ Run `npm run build` to type-check and produce the static site in `dist/`.
 
 ## Load the task plan
 
-The supplied 187 task rows are loaded from `data/tasks.json`. Numeric IDs and phase labels such as `1 Foundations` are normalized by the store. Additional task imports should keep the same fields:
+The supplied 186 task rows are loaded from `data/tasks.json`. Each task has a stable ID, track code, phase, step, hour budget, dependencies, completion criteria, topic, and group. Progress fields are `status`, `doneAt`, `notes`, `proofLink`, `minimumPass`, and `skippedAt`.
 
-```json
-{
-  "id": 1,
-  "phase": "1 Foundations",
-  "week": 1,
-  "track": "AI/ML",
-  "project": "Foundations",
-  "topic": "Set up the baseline",
-  "output": "A reproducible training run",
-  "resource": "https://example.com/reference",
-  "status": "Not started",
-  "dateDone": "",
-  "notes": ""
-}
-```
+Task status is `not_started`, `in_progress`, `done`, or `parked`. A lock is derived from prerequisite completion and is never stored. The persisted store uses schema version 2. When v1 week-based data is found, the app asks you to download a JSON backup before continuing with a fresh plan. Settings imports and exports schema-v2 JSON backups.
 
-Valid tracks are `AI/ML`, `Robotics`, `Design/Web`, `Video/Social`, and `Resume`. Valid statuses are `Not started`, `In progress`, and `Done`. User edits are stored separately from the fixed plan; matching IDs retain their updates when the plan is replaced. Export a backup before changing task IDs.
+Run `npm test` to run the Vitest parser, taxonomy, migration, and roadmap tests.
 
-Settings imports and exports JSON backups and CSV task rows. CSV imports must match the exported task columns. Changing the exam pause count shifts the plan start date by the difference in weeks, so current-week and finish-date calculations move with it.
-
-Run `npm test` to run the Vitest data and metrics tests.
-
-Each route is a lazily loaded page module under `src/pages/`; the app shell and shared UI live in `src/App.tsx` and `src/components/shared.tsx`. Vite emits separate route chunks in production builds.
+Dashboard, Tracker, Task Detail, and Settings are active v2 screens. Legacy week, project, review, and analytics URLs show a placeholder until their roadmap UI phase.
 
 ## Optional cross-device sync
 
 Local storage remains the offline cache and sync is disabled unless both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set. Copy `.env.example` to `.env`, fill in the Supabase project URL and anon key, then restart Vite. Never use a service-role key in the browser.
 
-Run `supabase/schema.sql` in the Supabase SQL Editor. Enable email authentication. In Auth URL Configuration, set the production Site URL and add redirect allow-list entries for `http://localhost:5173/**` and `https://<your-app>.vercel.app/**` (plus any custom domain). Settings provides email magic-link sign-in; after sign-in, editable records merge by `updated_at` and are pushed back to the account. The fixed `data/tasks.json` plan is never synced. Task status/date/notes, reviews, project links, resume checklist values, plan start date, and pause offset are synced. Deletions use timestamped tombstones so they propagate to other devices. Last-write-wins ordering uses device timestamps, so keep device clocks current.
+Run `supabase/schema.sql` in the Supabase SQL Editor. Enable email authentication. In Auth URL Configuration, set the production Site URL and add redirect allow-list entries for `http://localhost:5173/**` and `https://<your-app>.vercel.app/**` (plus any custom domain). Settings provides email magic-link sign-in; task updates merge by `updated_at` and are pushed back to the account. The fixed `data/tasks.json` plan is never synced. Last-write-wins ordering uses device timestamps, so keep device clocks current.
 
 ## Deploy
 
@@ -67,4 +49,4 @@ The app is a static Vite build. Import this folder into Vercel and use the defau
 
 ## Data and privacy
 
-Edits are stored in the browser and optionally synced to the signed-in user's Supabase account. Without configuration or a connection, the app remains usable from local storage. Settings supports JSON backup/restore and CSV task export. The included `/api/chat` file belongs to the previous Life Assistant app and is not used by the roadmap tracker.
+Edits are stored in the browser and optionally synced to the signed-in user's Supabase account. Without configuration or a connection, the app remains usable from local storage. Settings supports schema-v2 JSON backup and restore. The included `/api/chat` file belongs to the previous Life Assistant app and is not used by the roadmap tracker.

@@ -5,7 +5,72 @@
     "code": "RB",
     "color": "#7dd3fc",
     "icon": "bot",
-    "description": "ROS 2, service robots, warehouse systems, and robotic hardening work."
+    "description": "ROS 2, service robots, warehouse systems, and robotic hardening work.",
+    "groups": [
+      {
+        "name": "general",
+        "taskIds": [
+          "RB-01",
+          "RB-02",
+          "RB-03",
+          "RB-04",
+          "RB-05",
+          "RB-06",
+          "RB-07",
+          "RB-08",
+          "RB-09",
+          "RB-10",
+          "RB-11",
+          "RB-12",
+          "RB-13",
+          "RB-14",
+          "RB-15",
+          "RB-16",
+          "RB-17",
+          "RB-18",
+          "RB-19",
+          "RB-20",
+          "RB-21",
+          "RB-22",
+          "RB-23",
+          "RB-24",
+          "RB-25",
+          "RB-26",
+          "RB-27",
+          "RB-28",
+          "RB-29",
+          "RB-30",
+          "RB-31",
+          "RB-32",
+          "RB-33",
+          "RB-34",
+          "RB-35",
+          "RB-36",
+          "RB-37",
+          "RB-38",
+          "RB-39",
+          "RB-40",
+          "RB-41",
+          "RB-42",
+          "RB-43",
+          "RB-44",
+          "RB-45",
+          "RB-46",
+          "RB-47",
+          "RB-48",
+          "RB-49",
+          "RB-50",
+          "RB-51",
+          "RB-53",
+          "RB-54",
+          "RB-55",
+          "RB-56",
+          "RB-57",
+          "RB-58",
+          "RB-59"
+        ]
+      }
+    ]
   },
   {
     "slug": "ai-ml",
@@ -13,7 +78,67 @@
     "code": "ML",
     "color": "#a78bfa",
     "icon": "brain",
-    "description": "Python tooling, classical ML, neural nets, LLMs, and deployment skills."
+    "description": "Python tooling, classical ML, neural nets, LLMs, and deployment skills.",
+    "groups": [
+      {
+        "name": "general",
+        "taskIds": [
+          "ML-01",
+          "ML-02",
+          "ML-03",
+          "ML-04",
+          "ML-05",
+          "ML-06",
+          "ML-07",
+          "ML-08",
+          "ML-09",
+          "ML-10",
+          "ML-11",
+          "ML-12",
+          "ML-13",
+          "ML-14",
+          "ML-15",
+          "ML-16",
+          "ML-17",
+          "ML-18",
+          "ML-19",
+          "ML-20",
+          "ML-21",
+          "ML-22",
+          "ML-23",
+          "ML-24",
+          "ML-25",
+          "ML-26",
+          "ML-27",
+          "ML-28",
+          "ML-29",
+          "ML-30",
+          "ML-31",
+          "ML-32",
+          "ML-33",
+          "ML-34",
+          "ML-35",
+          "ML-36",
+          "ML-37",
+          "ML-38",
+          "ML-39",
+          "ML-40",
+          "ML-41",
+          "ML-42",
+          "ML-43",
+          "ML-44",
+          "ML-45",
+          "ML-46",
+          "ML-47",
+          "ML-48",
+          "ML-49",
+          "ML-50",
+          "ML-51",
+          "ML-52",
+          "ML-53"
+        ]
+      }
+    ]
   },
   {
     "slug": "github-polishing",
@@ -21,7 +146,41 @@
     "code": "DW",
     "color": "#34d399",
     "icon": "sparkles",
-    "description": "Repo hygiene, profile polish, and public-facing developer work."
+    "description": "Repo hygiene, profile polish, and public-facing developer work.",
+    "groups": [
+      {
+        "name": "general",
+        "taskIds": [
+          "DW-01",
+          "DW-02",
+          "DW-03",
+          "DW-04",
+          "DW-05",
+          "DW-06",
+          "DW-07",
+          "DW-08",
+          "DW-09",
+          "DW-10",
+          "DW-11",
+          "DW-12",
+          "DW-13",
+          "DW-14",
+          "DW-15",
+          "DW-16",
+          "DW-17",
+          "DW-18",
+          "DW-19",
+          "DW-20",
+          "DW-21",
+          "DW-22",
+          "DW-23",
+          "DW-24",
+          "DW-25",
+          "DW-26",
+          "DW-27"
+        ]
+      }
+    ]
   },
   {
     "slug": "design",
@@ -29,7 +188,8 @@
     "code": "DW",
     "color": "#fbbf24",
     "icon": "palette",
-    "description": "Visual systems, dashboards, and design foundations for portfolio work."
+    "description": "Visual systems, dashboards, and design foundations for portfolio work.",
+    "groups": []
   },
   {
     "slug": "portfolio-website",
@@ -37,7 +197,8 @@
     "code": "DW",
     "color": "#fb7185",
     "icon": "layout",
-    "description": "Portfolio buildout, case studies, and SEO polish."
+    "description": "Portfolio buildout, case studies, and SEO polish.",
+    "groups": []
   },
   {
     "slug": "videos",
@@ -45,7 +206,40 @@
     "code": "VD",
     "color": "#f472b6",
     "icon": "video",
-    "description": "Editing, recording, reels, and social storytelling for projects."
+    "description": "Editing, recording, reels, and social storytelling for projects.",
+    "groups": [
+      {
+        "name": "general",
+        "taskIds": [
+          "VD-01",
+          "VD-02",
+          "VD-03",
+          "VD-04",
+          "VD-05",
+          "VD-06",
+          "VD-07",
+          "VD-08",
+          "VD-09",
+          "VD-10",
+          "VD-11",
+          "VD-12",
+          "VD-13",
+          "VD-14",
+          "VD-15",
+          "VD-16",
+          "VD-17",
+          "VD-18",
+          "VD-19",
+          "VD-20",
+          "VD-21",
+          "VD-22",
+          "VD-23",
+          "VD-24",
+          "VD-25",
+          "VD-26"
+        ]
+      }
+    ]
   },
   {
     "slug": "resume-and-jobs",
@@ -53,6 +247,35 @@
     "code": "JB",
     "color": "#60a5fa",
     "icon": "briefcase",
-    "description": "Profiles, resumes, job applications, and interview prep."
+    "description": "Profiles, resumes, job applications, and interview prep.",
+    "groups": [
+      {
+        "name": "general",
+        "taskIds": [
+          "JB-01",
+          "JB-02",
+          "JB-03",
+          "JB-04",
+          "JB-05",
+          "JB-06",
+          "JB-07",
+          "JB-08",
+          "JB-09",
+          "JB-10",
+          "JB-11",
+          "JB-12",
+          "JB-13",
+          "JB-14",
+          "JB-15",
+          "JB-16",
+          "JB-17",
+          "JB-18",
+          "JB-19",
+          "JB-20",
+          "JB-21",
+          "JB-22"
+        ]
+      }
+    ]
   }
 ]

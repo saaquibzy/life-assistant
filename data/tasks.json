@@ -2389,7 +2389,7 @@
       "RB-37"
     ],
     "doneWhen": "One clip",
-    "optional": false,
+    "optional": true,
     "topic": "Robotics",
     "group": "general",
     "status": "not_started",
@@ -2476,7 +2476,7 @@
       "DW-09"
     ],
     "doneWhen": "Dashboard screens",
-    "optional": false,
+    "optional": true,
     "topic": "GitHub Polishing",
     "group": "general",
     "status": "not_started",
@@ -2941,7 +2941,7 @@
       "ML-43"
     ],
     "doneWhen": "Comparison table",
-    "optional": false,
+    "optional": true,
     "topic": "AI/ML",
     "group": "general",
     "status": "not_started",
@@ -3067,7 +3067,7 @@
       "RB-47"
     ],
     "doneWhen": "Calibration notes",
-    "optional": false,
+    "optional": true,
     "topic": "Robotics",
     "group": "general",
     "status": "not_started",
@@ -3530,7 +3530,7 @@
     "hoursNote": "6-8",
     "needs": "all earlier gates",
     "doneWhen": "Write-up and clip",
-    "optional": false,
+    "optional": true,
     "topic": "Robotics",
     "group": "general",
     "status": "not_started",
