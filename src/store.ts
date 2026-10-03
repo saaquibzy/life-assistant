@@ -4,6 +4,7 @@ import taskRows from '../data/tasks.json'
 import { canStartTask, normalizeNeeds, type RoadmapTask, type TaskStatus } from './lib/roadmap'
 import { syncRecordId, type SyncRecord } from './syncMerge'
 import { closeSession, openSession, trimOpenSession, validateTimerSessions, type TimerSession } from './lib/timer'
+import { newId } from './lib/id'
 
 export type Task = RoadmapTask
 export type Status = TaskStatus
@@ -245,7 +246,7 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       if (!updated) return state
       started = true
       const at = timestamp()
-      const sessions = openSession(state.timerSessions, { id: crypto.randomUUID(), taskId: id, startedAt: at, endedAt: null })
+      const sessions = openSession(state.timerSessions, { id: newId(), taskId: id, startedAt: at, endedAt: null })
       return { ...updated, timerSessions: sessions, activeSessionId: sessions[sessions.length - 1].id, lastSeenAt: at }
     })
     return started

@@ -26,7 +26,7 @@ export default function SwipePage() {
   const currentTask = stepDeck[stepIndex]
   const skippedToday = state.tasks.filter(task => isSkippedToday(task, refreshDate) && task.status !== 'done' && task.status !== 'parked')
 
-  const buzz = () => { if (navigator.vibrate) navigator.vibrate(18) }
+  const buzz = () => { if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') { try { navigator.vibrate(18) } catch { /* Haptics are optional. */ } } }
   const enterTopic = (name: string) => { setUndo(entries => [...entries, { kind:'topic', topic:name, queue:topicQueue }]); setTopicQueue(queue=>queue[0]===name?queue.slice(1):queue.filter(item=>item!==name)); setTopicName(name); setStepIndex(0); setFlipped(false); setStage('steps') }
   const skipTopic = () => { if (!currentTopic) return; setUndo(entries => [...entries, {kind:'topic', topic:currentTopic, queue:topicQueue}]); setTopicQueue(queue => [...queue.slice(1), queue[0]]); buzz() }
   const skipCurrentStep = () => { if (!currentTask) return; setUndo(entries => [...entries,{kind:'step',taskId:currentTask.id,previousSkippedAt:currentTask.skippedAt}]); state.updateTask(currentTask.id,{skippedAt:refreshDate}); setFlipped(false); buzz() }
