@@ -96,7 +96,19 @@ export function nextUnlocked(topic: string, state: RoadmapState): RoadmapTask | 
   return topicTasks.find((task) => !isTaskDone(task) && isUnlocked(task, state))
 }
 
-export function progressByPhase(tasks: RoadmapTask[], phase: number): {
+export function coreHours(tasks: RoadmapTask[]): number {
+  return tasks
+    .filter((task) => task.id !== 'RB-59')
+    .reduce((sum, task) => sum + task.budgetHours, 0)
+}
+
+export function optionalHours(tasks: RoadmapTask[]): number {
+  return tasks
+    .filter((task) => task.id === 'RB-59')
+    .reduce((sum, task) => sum + task.budgetHours, 0)
+}
+
+export function progressByPhase(tasks: RoadmapTask[], phase: number, includeOptional = false): {
   totalSteps: number
   doneSteps: number
   totalHours: number
@@ -104,7 +116,7 @@ export function progressByPhase(tasks: RoadmapTask[], phase: number): {
   percentSteps: number
   percentHours: number
 } {
-  const phaseTasks = tasks.filter((task) => task.phase === phase)
+  const phaseTasks = tasks.filter((task) => task.phase === phase && (includeOptional || task.id !== 'RB-59'))
   const totalSteps = phaseTasks.length
   const doneSteps = phaseTasks.filter((task) => isTaskDone(task)).length
   const totalHours = phaseTasks.reduce((sum, task) => sum + task.budgetHours, 0)
@@ -122,7 +134,7 @@ export function progressByPhase(tasks: RoadmapTask[], phase: number): {
   }
 }
 
-export function progressByTopic(tasks: RoadmapTask[], topic: string): {
+export function progressByTopic(tasks: RoadmapTask[], topic: string, includeOptional = false): {
   totalSteps: number
   doneSteps: number
   totalHours: number
@@ -130,7 +142,7 @@ export function progressByTopic(tasks: RoadmapTask[], topic: string): {
   percentSteps: number
   percentHours: number
 } {
-  const topicTasks = tasks.filter((task) => task.topic === topic)
+  const topicTasks = tasks.filter((task) => task.topic === topic && (includeOptional || task.id !== 'RB-59'))
   const totalSteps = topicTasks.length
   const doneSteps = topicTasks.filter((task) => isTaskDone(task)).length
   const totalHours = topicTasks.reduce((sum, task) => sum + task.budgetHours, 0)

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  coreHours,
   elapsedAcrossSessions,
   gateCycleCheck,
   isUnlocked,
   nextUnlocked,
+  optionalHours,
   parseHours,
   progressByPhase,
   resolveSwipe,
@@ -124,6 +126,16 @@ describe('roadmap parsing and gating', () => {
 
   it('tracks progress by phase in steps and hours', () => {
     expect(progressByPhase(tasks, 0)).toMatchObject({ totalSteps: 2, doneSteps: 1, totalHours: 6, doneHours: 2 })
+  })
+
+  it('keeps core and optional hour totals separate', () => {
+    const withOptional: RoadmapTask[] = [
+      ...tasks,
+      { ...tasks[0], id: 'RB-59', phase: 5, step: 'Humanoid RL', budgetHours: 8, topic: 'Robotics', group: 'R4', status: 'not_started', optional: true },
+    ]
+    expect(coreHours(withOptional)).toBe(10)
+    expect(optionalHours(withOptional)).toBe(8)
+    expect(progressByPhase(withOptional, 5).totalHours).toBe(3)
   })
 
   it('catches dependency cycles', () => {

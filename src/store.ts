@@ -62,7 +62,7 @@ export const normalizeTask = (task: TaskInput): Task => ({
   id: String(task.id),
   phase: typeof task.phase === 'number' ? task.phase : Number(task.phase.match(/^\d+/)?.[0]),
 })
-const initialTasks = (taskRows as TaskInput[]).map(normalizeTask)
+const initialTasks = (taskRows as unknown as TaskInput[]).map(normalizeTask)
 const blankReview = (): Review => ({ hoursSpent: 0, whatIFinished: '', whatBlockedMe: '', postedThisWeek: false, nextWeeksGoals: '' })
 const today = () => new Date().toISOString().slice(0, 10)
 const timestamp = () => new Date().toISOString()
