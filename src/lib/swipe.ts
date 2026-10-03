@@ -1,4 +1,4 @@
-import { isUnlocked, resolveSwipe, type RoadmapTask } from './roadmap'
+import { lockedReason, resolveSwipe, type RoadmapTask } from './roadmap'
 export { resolveSwipe }
 
 export type SwipeStage = 'topics' | 'steps'
@@ -13,8 +13,8 @@ export function isSkippedToday(task: Pick<RoadmapTask, 'skippedAt'>, date = new 
 }
 
 export function buildStepDeck(tasks: RoadmapTask[], topic: string, date = new Date().toISOString().slice(0, 10)): RoadmapTask[] {
-  return tasks.filter(task => task.topic === topic && task.status !== 'done' && task.status !== 'parked' && !isSkippedToday(task, date) && isUnlocked(task, { tasks }))
-    .sort((a, b) => Number(a.optional) - Number(b.optional))
+  return tasks.filter(task => task.topic === topic && task.status !== 'done' && task.status !== 'parked' && !isSkippedToday(task, date))
+    .sort((a, b) => Number(lockedReason(a, { tasks }).length > 0) - Number(lockedReason(b, { tasks }).length > 0) || Number(a.optional) - Number(b.optional))
 }
 
 export function skipStep(tasks: RoadmapTask[], id: string, date = new Date().toISOString().slice(0, 10)): RoadmapTask[] {

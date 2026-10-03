@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { ArrowLeft, Check, CircleHelp, LockKeyhole } from 'lucide-react'
 import { type Status, type Task, useRoadmap } from '../store'
-import { getBlockingParents, isUnlocked, progressByTopic, selectNextUnlockedInGroup } from '../lib/roadmap'
+import { isUnlocked, lockedReason, progressByTopic, selectNextUnlockedInGroup } from '../lib/roadmap'
 import topicRows from '../../data/topics.json'
 
 export const phases = ['Setup', 'Foundations', 'Core builds', 'Research', 'Deployment', 'Finish']
@@ -103,12 +103,12 @@ export function TaskRow({ task, compact = false }: { task: Task; compact?: boole
 
 export function TaskStepItem({ task, tasks }: { task: Task; tasks: Task[] }) {
   const unlocked = isUnlocked(task, { tasks })
-  const blockers = getBlockingParents(task, tasks)
+  const blockers = lockedReason(task, { tasks })
   return <article className={`task-step-item${unlocked ? '' : ' locked'}`}>
     {!unlocked && <LockKeyhole size={15} aria-label="Locked" />}
     <span className="task-step-id">{task.id}</span>
     <div className="task-step-copy"><Link to={`/task/${task.id}`}><strong>{task.step}</strong></Link><small>{task.budgetHours} h · Phase {task.phase}{task.optional ? ' · Optional' : ''}</small>
-      {blockers.length > 0 && <div className="blocking-chips"><span>Needs</span>{blockers.slice(0, 4).map((parent) => <Link key={parent.id} to={`/task/${parent.id}`}>{parent.id}</Link>)}{blockers.length > 4 && <span>+{blockers.length - 4}</span>}</div>}
+      {blockers.length > 0 && <div className="blocking-chips"><span>Needs</span>{blockers.slice(0, 4).map((id) => <Link key={id} to={`/task/${id}`}>{id}</Link>)}{blockers.length > 4 && <span>+{blockers.length - 4}</span>}</div>}
     </div>
     <StatusPill status={task.status} />
   </article>

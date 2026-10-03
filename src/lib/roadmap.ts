@@ -93,6 +93,14 @@ export function getBlockingParents(task: RoadmapTask, tasks: RoadmapTask[]): Roa
   return tasks.filter((candidate) => parents.has(candidate.id) && !isTaskDone(candidate))
 }
 
+export function lockedReason(task: RoadmapTask, state: RoadmapState): string[] {
+  if (isUnlocked(task, state)) return []
+  return getParentIds(task, state.tasks).filter((id) => {
+    const parent = state.tasks.find((candidate) => candidate.id === id)
+    return !parent || !isTaskDone(parent)
+  })
+}
+
 export function canStartTask(task: RoadmapTask, tasks: RoadmapTask[], strictGates: boolean, confirmed = false): boolean {
   return isUnlocked(task, { tasks }) || (!strictGates && confirmed)
 }
