@@ -24,12 +24,14 @@ const SettingsPageLazy = lazy(() => import("./pages/Settings"));
 const NotFoundPage = lazy(() => import("./pages/NotFound"));
 const FocusPage = lazy(() => import('./pages/Focus'));
 const AnalyticsPage = lazy(() => import('./pages/Analytics'));
+const SwipePage = lazy(() => import('./pages/Swipe'));
 
 
 
 function App() {
   const theme = useRoadmap((state) => state.theme);
   const migrationBackup = useRoadmap((state) => state.migrationBackup);
+  const swipeDefaultMobile = useRoadmap((state) => state.swipeDefaultMobile);
   const [backupDownloaded, setBackupDownloaded] = useState(false);
   const [backupUrl, setBackupUrl] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -44,6 +46,10 @@ function App() {
   );
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(() => {
+    if (location.pathname === '/swipe') useRoadmap.getState().setSwipeMode(true);
+    else if (location.pathname === '/' && swipeDefaultMobile && window.matchMedia('(max-width: 620px)').matches && sessionStorage.getItem('classic-home-override') !== 'true') navigate('/swipe', { replace: true });
+  }, [location.pathname, swipeDefaultMobile, navigate]);
   const activeId = useRoadmap(s => s.timerSessions.find(x => x.id === s.activeSessionId)?.taskId ?? null);
   const sessions = useRoadmap(s => s.timerSessions);
   const budgetNotifications = useRoadmap(s => s.budgetNotifications);
@@ -228,6 +234,7 @@ function App() {
             <span className="slash">/</span>
             <b>{breadcrumb(location.pathname)}</b>
           </div>
+          <div className="mode-toggle" aria-label="Home mode"><button className={location.pathname !== '/swipe' ? 'selected' : ''} onClick={() => { sessionStorage.setItem('classic-home-override','true'); useRoadmap.getState().setSwipeMode(false); navigate('/') }}>Classic</button><button className={location.pathname === '/swipe' ? 'selected' : ''} onClick={() => { sessionStorage.removeItem('classic-home-override'); useRoadmap.getState().setSwipeMode(true); navigate('/swipe') }}>Swipe</button></div>
           <div className="top-actions">
             <button
               className="icon-button collapse-button"
@@ -294,6 +301,7 @@ function App() {
               <Route path="/settings" element={<SettingsPageLazy />} />
               <Route path="/focus/:id" element={<FocusPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/swipe" element={<SwipePage />} />
               <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <TimerBar now={clockNow} />

@@ -324,9 +324,9 @@ export function gateCycleCheck(tasks: RoadmapTask[]): { hasCycle: boolean; cycle
   return { hasCycle: found, cycle: uniqueCycle }
 }
 
-export function resolveSwipe(offsetX: number, velocityX: number, threshold = 110): 'left' | 'right' | 'none' {
-  if (offsetX > threshold || velocityX > 600) return 'right'
-  if (offsetX < -threshold || velocityX < -600) return 'left'
+export function resolveSwipe(offsetX: number, velocityX: number, threshold = 100): 'left' | 'right' | 'none' {
+  if (offsetX >= threshold || velocityX >= 500) return 'right'
+  if (offsetX <= -threshold || velocityX <= -500) return 'left'
   return 'none'
 }
 

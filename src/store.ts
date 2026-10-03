@@ -20,6 +20,8 @@ type AppState = {
   activeSessionId: string | null
   lastSeenAt: string | null
   budgetNotifications: boolean
+  swipeMode: boolean
+  swipeDefaultMobile: boolean
   tasks: Task[]
   theme: 'dark' | 'light'
   strictGates: boolean
@@ -42,6 +44,8 @@ type AppState = {
   setGateCheck: (key: string, value: boolean) => void
   setHabitsEnabled: (value: boolean) => void
   setBudgetNotifications: (value: boolean) => void
+  setSwipeMode: (value: boolean) => void
+  setSwipeDefaultMobile: (value: boolean) => void
   toggleHabit: (habit: HabitKey, date?: string) => void
   toggleRestWeek: (week: string) => void
   applySyncRecords: (records: SyncRecord[]) => void
@@ -96,7 +100,7 @@ export function normalizeTask(task: TaskData): Task {
 
 export const initialTasks: Task[] = taskRows.map(normalizeTask)
 
-type PersistedState = Pick<AppState, 'schemaVersion' | 'tasks' | 'theme' | 'strictGates' | 'gateChecks' | 'habitsEnabled' | 'habits' | 'restWeeks' | 'syncRecords' | 'migrationBackup' | 'timerSessions' | 'activeSessionId' | 'lastSeenAt' | 'budgetNotifications'>
+type PersistedState = Pick<AppState, 'schemaVersion' | 'tasks' | 'theme' | 'strictGates' | 'gateChecks' | 'habitsEnabled' | 'habits' | 'restWeeks' | 'syncRecords' | 'migrationBackup' | 'timerSessions' | 'activeSessionId' | 'lastSeenAt' | 'budgetNotifications' | 'swipeMode' | 'swipeDefaultMobile'>
 
 function isPersistedV2(value: unknown): value is PersistedState {
   if (!value || typeof value !== 'object') return false
@@ -119,7 +123,7 @@ const freshState = (): PersistedState => ({
   restWeeks: [],
   syncRecords: {},
   migrationBackup: null,
-  timerSessions: [], activeSessionId: null, lastSeenAt: null, budgetNotifications: false,
+  timerSessions: [], activeSessionId: null, lastSeenAt: null, budgetNotifications: false, swipeMode: false, swipeDefaultMobile: false,
 })
 
 export function migratePersistedState(persisted: unknown, version: number): PersistedState {
@@ -164,9 +168,9 @@ export function applyTaskUpdate(task: Task, update: TaskUpdate): Task {
   const doneAt = status === 'done'
     ? (update.doneAt ?? task.doneAt) || today()
     : ''
-  const skippedAt = status === 'parked'
-    ? update.skippedAt ?? task.skippedAt ?? today()
-    : null
+  const skippedAt = update.skippedAt !== undefined
+    ? update.skippedAt
+    : status === 'parked' ? task.skippedAt ?? today() : status === 'done' ? null : task.skippedAt
   return { ...task, ...update, status, doneAt, skippedAt }
 }
 
@@ -280,6 +284,8 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
   setGateCheck: (key, value) => set((state) => ({ gateChecks: { ...state.gateChecks, [key]: value } })),
   setHabitsEnabled: (habitsEnabled) => set({ habitsEnabled }),
   setBudgetNotifications: (budgetNotifications) => set({ budgetNotifications }),
+  setSwipeMode: (swipeMode) => set({ swipeMode }),
+  setSwipeDefaultMobile: (swipeDefaultMobile) => set({ swipeDefaultMobile }),
   toggleHabit: (habit, date = today()) => set((state) => {
     const dates = state.habits[habit]
     return { habits: { ...state.habits, [habit]: dates.includes(date) ? dates.filter((item) => item !== date) : [...dates, date] } }
@@ -326,5 +332,7 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
     activeSessionId: state.activeSessionId,
     lastSeenAt: state.lastSeenAt,
     budgetNotifications: state.budgetNotifications,
+    swipeMode: state.swipeMode,
+    swipeDefaultMobile: state.swipeDefaultMobile,
   }),
 }))
