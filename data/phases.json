@@ -1,0 +1,26 @@
+[
+  {
+    "phase": 0,
+    "gate": "Core setup complete"
+  },
+  {
+    "phase": 1,
+    "gate": "Foundations validated"
+  },
+  {
+    "phase": 2,
+    "gate": "Mid-project proof in place"
+  },
+  {
+    "phase": 3,
+    "gate": "Public-facing demo ready"
+  },
+  {
+    "phase": 4,
+    "gate": "Portfolio and proof package locked"
+  },
+  {
+    "phase": 5,
+    "gate": "Final retrospective complete"
+  }
+]

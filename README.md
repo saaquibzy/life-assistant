@@ -2,6 +2,22 @@
 
 A responsive, multi-page roadmap for robotics and AI/ML work. Tasks are loaded from `data/tasks.json`; editable status, notes, dates, reviews, and links are persisted in this browser with Zustand and can optionally sync through Supabase.
 
+## Hours-based roadmap layer
+
+The repo now includes a data-planning layer for the new roadmap-by-hours model:
+
+- `scripts/parse-roadmap.ts` reads `docs/Roadmap_by_Hours.md` and writes `data/tasks.json`, `data/phases.json`, `data/cut-order.json`, and `data/topics.json`.
+- `src/lib/roadmap.ts` contains the pure gate logic for `isUnlocked`, `nextUnlocked`, progress tracking, dependency-cycle checks, and swipe resolution.
+- The parser validates unique IDs, missing dependencies, cycles, orphaned topic/group assignments, and optional summary-hour checks.
+
+Run the parser with:
+
+```sh
+npm run parse-roadmap
+```
+
+The generated JSON is built for the new schema and is ready to feed the hours-based UI without hardcoding task data into the app shell.
+
 ## Run locally
 
 ```sh

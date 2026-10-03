@@ -1,0 +1,58 @@
+[
+  {
+    "slug": "robotics",
+    "name": "Robotics",
+    "code": "RB",
+    "color": "#7dd3fc",
+    "icon": "bot",
+    "description": "ROS 2, service robots, warehouse systems, and robotic hardening work."
+  },
+  {
+    "slug": "ai-ml",
+    "name": "AI/ML",
+    "code": "ML",
+    "color": "#a78bfa",
+    "icon": "brain",
+    "description": "Python tooling, classical ML, neural nets, LLMs, and deployment skills."
+  },
+  {
+    "slug": "github-polishing",
+    "name": "GitHub Polishing",
+    "code": "DW",
+    "color": "#34d399",
+    "icon": "sparkles",
+    "description": "Repo hygiene, profile polish, and public-facing developer work."
+  },
+  {
+    "slug": "design",
+    "name": "Design",
+    "code": "DW",
+    "color": "#fbbf24",
+    "icon": "palette",
+    "description": "Visual systems, dashboards, and design foundations for portfolio work."
+  },
+  {
+    "slug": "portfolio-website",
+    "name": "Portfolio Website",
+    "code": "DW",
+    "color": "#fb7185",
+    "icon": "layout",
+    "description": "Portfolio buildout, case studies, and SEO polish."
+  },
+  {
+    "slug": "videos",
+    "name": "Videos",
+    "code": "VD",
+    "color": "#f472b6",
+    "icon": "video",
+    "description": "Editing, recording, reels, and social storytelling for projects."
+  },
+  {
+    "slug": "resume-and-jobs",
+    "name": "Resume and Jobs",
+    "code": "JB",
+    "color": "#60a5fa",
+    "icon": "briefcase",
+    "description": "Profiles, resumes, job applications, and interview prep."
+  }
+]
