@@ -44,17 +44,24 @@ function SettingsPage() {
     habitsEnabled: state.habitsEnabled,
     habits: state.habits,
     restWeeks: state.restWeeks,
+    timerSessions: state.timerSessions,
+    budgetNotifications: state.budgetNotifications,
+    activeSessionId: state.activeSessionId,
+    lastSeenAt: state.lastSeenAt,
   }, null, 2), 'application/json')
   const importFile = async (file?: File) => {
     if (!file) return
     try {
       const parsed: unknown = JSON.parse(await file.text())
       if (!parsed || typeof parsed !== 'object') throw new Error('That file does not look like a v2 roadmap backup.')
-      const backup = parsed as { schemaVersion?: unknown; tasks?: unknown; theme?: unknown; strictGates?: unknown; gateChecks?: unknown; habitsEnabled?: unknown; habits?: unknown; restWeeks?: unknown }
+      const backup = parsed as { schemaVersion?: unknown; tasks?: unknown; theme?: unknown; strictGates?: unknown; gateChecks?: unknown; habitsEnabled?: unknown; habits?: unknown; restWeeks?: unknown; timerSessions?: unknown; activeSessionId?: unknown; lastSeenAt?: unknown }
       if (backup.schemaVersion !== 2 || !Array.isArray(backup.tasks) || !backup.tasks.every(isTask)) {
         throw new Error('Import a schema v2 JSON backup with valid task records.')
       }
       if (backup.strictGates !== undefined && typeof backup.strictGates !== 'boolean') throw new Error('Invalid strict-gate setting in backup.')
+      if (backup.timerSessions !== undefined && (!Array.isArray(backup.timerSessions) || !backup.timerSessions.every((s: any) => s && typeof s.id === 'string' && typeof s.taskId === 'string' && typeof s.startedAt === 'string' && (typeof s.endedAt === 'string' || s.endedAt === null)))) throw new Error('Invalid timer sessions in backup.')
+      if (backup.activeSessionId !== undefined && backup.activeSessionId !== null && typeof backup.activeSessionId !== 'string') throw new Error('Invalid active session in backup.')
+      if (backup.lastSeenAt !== undefined && backup.lastSeenAt !== null && typeof backup.lastSeenAt !== 'string') throw new Error('Invalid last seen timestamp in backup.')
       state.importData({
         tasks: backup.tasks,
         theme: backup.theme === 'light' ? 'light' : 'dark',
@@ -63,6 +70,9 @@ function SettingsPage() {
         habitsEnabled: backup.habitsEnabled as boolean | undefined,
         habits: backup.habits as typeof state.habits | undefined,
         restWeeks: backup.restWeeks as string[] | undefined,
+        timerSessions: backup.timerSessions as typeof state.timerSessions | undefined,
+        activeSessionId: backup.activeSessionId as string | null | undefined,
+        lastSeenAt: backup.lastSeenAt as string | null | undefined,
       })
       setMessage(`Imported ${backup.tasks.length} tasks.`)
     } catch (error) {
@@ -76,6 +86,7 @@ function SettingsPage() {
       <Panel title="Roadmap behavior">
         <label className="setting-row setting-toggle-row"><span><strong>Strict gates</strong><small>{state.strictGates ? 'Locked tasks cannot start before prerequisites.' : 'Starting locked tasks requires confirmation.'}</small></span><input type="checkbox" checked={state.strictGates} onChange={(event) => state.setStrictGates(event.target.checked)} /></label>
         <label className="setting-row setting-toggle-row"><span><strong>Habits card</strong><small>Show daily habits and streaks on Dashboard.</small></span><input type="checkbox" checked={state.habitsEnabled} onChange={(event) => state.setHabitsEnabled(event.target.checked)} /></label>
+        <label className="setting-row setting-toggle-row"><span><strong>Budget notification</strong><small>Notify when a focused step reaches its estimate.</small></span><input type="checkbox" checked={state.budgetNotifications} onChange={async (event) => { if (event.target.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission(); state.setBudgetNotifications(event.target.checked) }} /></label>
       </Panel>
       <Panel title="Cross-device sync"><div className="setting-row"><div><strong>{sync.email ? `Signed in as ${sync.email}` : 'Signed out'}</strong><small>{sync.configured ? sync.status : 'Supabase is not configured'}</small></div><span className={`tag ${sync.status === 'Synced' ? 'green-tag' : 'muted-tag'}`}>{sync.status}</span></div>
         {!sync.configured ? <p className="setting-hint">Add the Supabase environment variables to enable optional sync.</p> : sync.email ? <div className="settings-actions">{(sync.status === 'Error' || sync.status === 'Offline') && <button className="button secondary" disabled={!navigator.onLine} onClick={() => void sync.retry()}>Retry sync</button>}<button className="button secondary" onClick={() => void sync.signOut().catch(() => {})}>Sign out</button></div> : <><label className="field-label">Email<input type="email" value={syncEmail} onChange={(event) => setSyncEmail(event.target.value)} /></label><button className="button secondary" disabled={!syncEmail.trim() || sync.status === 'Syncing'} onClick={() => void sync.signIn(syncEmail.trim()).catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Could not send sign-in link.'))}>Send magic link</button></>}

@@ -4,9 +4,10 @@ import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-ro
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { ArrowDownToLine, ArrowUpRight, Check, Command, Flag, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, Tags, WandSparkles, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Check, Command, Flag, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, Tags, WandSparkles, X, Pause } from "lucide-react";
 
 import { useRoadmap } from "./store";
+import { elapsedAcrossSessions, ringLevel } from "./lib/timer";
 
 import { phases, trackClass, taskProgress, PageSkeleton } from "./components/shared";
 
@@ -21,6 +22,8 @@ const PhasesPage = lazy(() => import("./pages/Phases"));
 const PhaseDetailPage = lazy(() => import("./pages/PhaseDetail"));
 const SettingsPageLazy = lazy(() => import("./pages/Settings"));
 const NotFoundPage = lazy(() => import("./pages/NotFound"));
+const FocusPage = lazy(() => import('./pages/Focus'));
+const AnalyticsPage = lazy(() => import('./pages/Analytics'));
 
 
 
@@ -41,6 +44,18 @@ function App() {
   );
   const navigate = useNavigate();
   const location = useLocation();
+  const activeId = useRoadmap(s => s.timerSessions.find(x => x.id === s.activeSessionId)?.taskId ?? null);
+  const sessions = useRoadmap(s => s.timerSessions);
+  const budgetNotifications = useRoadmap(s => s.budgetNotifications);
+  const [clockNow, setClockNow] = useState(Date.now());
+  const [overrunId, setOverrunId] = useState<string | null>(null);
+  const [overrunNote, setOverrunNote] = useState('');
+  useEffect(() => { const timer = window.setInterval(() => setClockNow(Date.now()), 1000); const seen = window.setInterval(() => useRoadmap.getState().updateLastSeen(), 60000); return () => { clearInterval(timer); clearInterval(seen) } }, []);
+  useEffect(() => { const task = useRoadmap.getState().tasks.find(x => x.id === activeId); const active = useRoadmap.getState().timerSessions.find(x => x.id === useRoadmap.getState().activeSessionId); if (!active || !task) { setOverrunId(null); return } const snooze = Number(sessionStorage.getItem(`2x-snooze-${active.id}`) ?? 0); if (elapsedAcrossSessions(useRoadmap.getState().timerSessions, activeId!) >= task.budgetHours * 7200000 && Date.now() >= snooze && !sessionStorage.getItem(`2x-done-${active.id}`)) setOverrunId(active.id) }, [activeId, clockNow, sessions]);
+  useEffect(() => { const task = useRoadmap.getState().tasks.find(x => x.id === activeId); const elapsed = activeId ? elapsedAcrossSessions(useRoadmap.getState().timerSessions, activeId, clockNow) : 0; document.title = task ? `${formatClock(elapsed)} · ${task.id}` : 'Route/Hrs' }, [activeId, clockNow, sessions]);
+  useEffect(() => { if (!budgetNotifications || !activeId || !('Notification' in window) || Notification.permission !== 'granted') return; const active = useRoadmap.getState().timerSessions.find(x => x.id === useRoadmap.getState().activeSessionId); const task = useRoadmap.getState().tasks.find(x => x.id === activeId); if (active && task && elapsedAcrossSessions(useRoadmap.getState().timerSessions, activeId) >= task.budgetHours * 3600000 && !sessionStorage.getItem(`budget-${active.id}`)) { sessionStorage.setItem(`budget-${active.id}`, '1'); new Notification(`${task.id} reached its time estimate`) } }, [budgetNotifications, activeId, clockNow, sessions]);
+  useEffect(() => { const active = useRoadmap.getState().timerSessions.find(s => s.id === useRoadmap.getState().activeSessionId); const last = useRoadmap.getState().lastSeenAt; if (active && last && Date.now() - Date.parse(last) > 1800000) { if (window.confirm('Keep all time? Choose Cancel to trim to when you left.')) useRoadmap.getState().pauseTask(active.taskId); else useRoadmap.getState().trimActiveSession(last); } }, []);
+  useEffect(() => { const sync = (event: StorageEvent) => { if (event.key === 'roadmap-tracker-v1') void (useRoadmap as any).persist?.rehydrate?.() }; window.addEventListener('storage', sync); return () => window.removeEventListener('storage', sync) }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
@@ -139,6 +154,7 @@ function App() {
     { to: '/tracker', label: 'Tracker', icon: ListTodo },
     { to: '/topics', label: 'Topics', icon: Tags },
     { to: '/phases', label: 'Phases', icon: Flag },
+    { to: '/analytics', label: 'Analytics', icon: ArrowUpRight },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
   return (
@@ -276,8 +292,12 @@ function App() {
               <Route path="/phases" element={<PhasesPage />} />
               <Route path="/phases/:id" element={<PhaseDetailPage />} />
               <Route path="/settings" element={<SettingsPageLazy />} />
+              <Route path="/focus/:id" element={<FocusPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+        </Routes>
+        <TimerBar now={clockNow} />
+        {overrunId && <div className="command-backdrop"><section className="command-box completion-dialog" role="dialog" aria-modal="true"><h2>Do the minimum pass and finish</h2><p>{useRoadmap.getState().tasks.find(t=>t.id===activeId)?.id} is at 200% of its time budget.</p><button className="button primary" onClick={() => { sessionStorage.setItem(`2x-done-${overrunId}`, '1'); setOverrunId(null); navigate(`/focus/${activeId}`) }}>Do the minimum pass and finish</button><label className="field-label">Blocker note for parking<textarea value={overrunNote} onChange={e=>setOverrunNote(e.target.value)} placeholder="Required to park"/></label><button className="button secondary" disabled={!overrunNote.trim()} onClick={() => { if(activeId) useRoadmap.getState().parkTask(activeId,overrunNote); setOverrunNote(''); setOverrunId(null) }}>Park it</button><button className="button secondary" onClick={() => { sessionStorage.setItem(`2x-snooze-${overrunId}`,String(Date.now()+30*60000)); setOverrunId(null) }}>Keep going · 30 min</button></section></div>}
             </Suspense>
           </motion.div>
         </AnimatePresence>
@@ -392,6 +412,11 @@ function breadcrumb(path: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function formatClock(ms: number) {
+  const seconds = Math.floor(ms / 1000);
+  return `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 function MobileNav() {
   return (
     <nav className="mobile-nav">
@@ -400,6 +425,7 @@ function MobileNav() {
         { to: '/tracker', label: 'Tracker', icon: ListTodo },
         { to: '/topics', label: 'Topics', icon: Tags },
         { to: '/phases', label: 'Phases', icon: Flag },
+        { to: '/analytics', label: 'Analytics', icon: ArrowUpRight },
         { to: '/settings', label: 'Settings', icon: Settings },
       ].map(({ to, label, icon: Icon }) => (
         <NavLink
@@ -416,6 +442,15 @@ function MobileNav() {
       ))}
     </nav>
   );
+}
+
+function TimerBar({ now }: { now: number }) {
+  const state = useRoadmap(); const active = state.timerSessions.find(s => s.id === state.activeSessionId); const task = active && state.tasks.find(t => t.id === active.taskId);
+  if (!active || !task) return null;
+  const elapsed = elapsedAcrossSessions(state.timerSessions, task.id, now); const percent = elapsed / (task.budgetHours * 3600000) * 100; const seconds = Math.floor(elapsed / 1000);
+  const time = `${String(Math.floor(seconds / 3600)).padStart(2,'0')}:${String(Math.floor(seconds / 60) % 60).padStart(2,'0')}:${String(seconds % 60).padStart(2,'0')}`;
+  const level = ringLevel(percent);
+  return <aside className={`timer-bar timer-${level}`}><Link to={`/focus/${task.id}`}><b>{task.id}</b><span>{task.step}</span></Link><div className="timer-budget"><i style={{width:`${Math.min(percent,100)}%`}}/><small>{time} / {task.budgetHours} h</small></div><button className="button secondary" onClick={() => state.pauseTask(task.id)}><Pause size={14}/>Pause</button><Link className="button primary" to={`/focus/${task.id}`}>Complete</Link><Link className="timer-focus-link" to={`/focus/${task.id}`}>Focus ↗</Link></aside>
 }
 
 export default App;

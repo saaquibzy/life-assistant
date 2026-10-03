@@ -55,7 +55,7 @@ describe('task state', () => {
     expect(JSON.parse(migrated.migrationBackup ?? '{}')).toMatchObject({ tasks: [{ id: 1, week: 1 }] })
   })
 
-  it('returns valid v2 persisted data untouched', () => {
+  it('loads valid legacy v2 data with additive timer defaults', () => {
     const persisted = {
       schemaVersion: 2 as const,
       tasks: initialTasks,
@@ -63,7 +63,7 @@ describe('task state', () => {
       syncRecords: {},
       migrationBackup: null,
     }
-    expect(migratePersistedState(persisted, 2)).toBe(persisted)
+    expect(migratePersistedState(persisted, 2)).toMatchObject({ ...persisted, timerSessions: [], activeSessionId: null, lastSeenAt: null })
   })
 
   it('refreshes plan metadata while preserving saved task progress', () => {

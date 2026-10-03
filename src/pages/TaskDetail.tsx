@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, LockKeyhole, Play, SkipForward } from 'lucide-react'
 import { getBlockingParents, getParentIds, isUnlocked } from '../lib/roadmap'
 import { useRoadmap } from '../store'
@@ -7,10 +7,10 @@ import { DetailField, NotFound, PageTitle, Panel, StatusPill } from '../componen
 
 function TaskDetail() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const state = useRoadmap()
   const task = state.tasks.find((item) => item.id === id)
   const [blockerNote, setBlockerNote] = useState('')
-  const [doneWhenConfirmed, setDoneWhenConfirmed] = useState(false)
   if (!task) return <NotFound />
   const unlocked = isUnlocked(task, { tasks: state.tasks })
   const blockers = getBlockingParents(task, state.tasks)
@@ -18,11 +18,9 @@ function TaskDetail() {
   const lockedNeedsConfirmation = !unlocked && !state.strictGates
   const start = () => {
     if (lockedNeedsConfirmation && !window.confirm(`Start ${task.id} before its prerequisites are complete?`)) return
-    if (state.startTask(task.id, lockedNeedsConfirmation)) setBlockerNote('')
-  }
-  const complete = () => {
-    if (lockedNeedsConfirmation && !window.confirm(`Complete ${task.id} before its prerequisites are complete?`)) return
-    state.completeTask(task.id, doneWhenConfirmed, lockedNeedsConfirmation)
+    const running = state.timerSessions.find(s => s.id === state.activeSessionId)
+    if (running && running.taskId !== task.id) { const old = state.tasks.find(t => t.id === running.taskId); if (!window.confirm(`Pause ${old?.id ?? running.taskId} and start ${task.id}?`)) return; state.pauseTask(running.taskId) }
+    if (state.startTask(task.id, lockedNeedsConfirmation)) { setBlockerNote(''); navigate(`/focus/${task.id}`) }
   }
   const parentIds = new Set(getParentIds(task, state.tasks))
   const parentTasks = state.tasks.filter((candidate) => parentIds.has(candidate.id))
@@ -51,8 +49,7 @@ function TaskDetail() {
         <Panel title="Status controls">
           <div className="task-action-stack">
             <button className="button primary full-button" disabled={!unlocked && state.strictGates} onClick={start}><Play size={15} />{task.status === 'in_progress' ? 'Continue' : 'Start step'}</button>
-            <label className="review-check"><input type="checkbox" checked={doneWhenConfirmed} onChange={(event) => setDoneWhenConfirmed(event.target.checked)} /> I confirmed the “Done when” criteria</label>
-            <button className="button secondary full-button" disabled={!doneWhenConfirmed || (!unlocked && state.strictGates)} onClick={complete}><Check size={15} />Complete step</button>
+            <Link className="button secondary full-button" to={`/focus/${task.id}`}><Check size={15} />Complete step</Link>
             {task.status !== 'parked' ? <><label className="field-label">Blocker note (required to park)<textarea value={blockerNote} onChange={(event) => setBlockerNote(event.target.value)} placeholder="What is blocking this step?" /></label><button className="button secondary full-button" disabled={!blockerNote.trim()} onClick={() => { if (state.parkTask(task.id, blockerNote)) setBlockerNote('') }}><SkipForward size={15} />Park step</button></> : <DetailField label="Parked on" value={task.skippedAt ?? 'Not recorded'} />}
             <label className="review-check"><input type="checkbox" checked={task.minimumPass} onChange={(event) => state.updateTask(task.id, { minimumPass: event.target.checked })} /> Minimum pass</label>
           </div>

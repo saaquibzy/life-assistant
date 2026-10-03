@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import taskRows from '../data/tasks.json'
 import { canStartTask, normalizeNeeds, type RoadmapTask, type TaskStatus } from './lib/roadmap'
 import { syncRecordId, type SyncRecord } from './syncMerge'
+import { closeSession, openSession, trimOpenSession, validateTimerSessions, type TimerSession } from './lib/timer'
 
 export type Task = RoadmapTask
 export type Status = TaskStatus
@@ -15,6 +16,10 @@ type TaskData = Omit<Task, 'trackCode' | 'status' | 'needs'> & {
 }
 type AppState = {
   schemaVersion: 2
+  timerSessions: TimerSession[]
+  activeSessionId: string | null
+  lastSeenAt: string | null
+  budgetNotifications: boolean
   tasks: Task[]
   theme: 'dark' | 'light'
   strictGates: boolean
@@ -27,12 +32,16 @@ type AppState = {
   updateTask: (id: string, update: TaskUpdate, confirmedLocked?: boolean) => void
   updateMany: (ids: string[], status: Status) => void
   startTask: (id: string, confirmedLocked?: boolean) => boolean
+  pauseTask: (id?: string) => void
+  updateLastSeen: (at?: string) => void
+  trimActiveSession: (at: string) => void
   parkTask: (id: string, blockerNote: string) => boolean
   completeTask: (id: string, doneWhenConfirmed: boolean, confirmedLocked?: boolean) => boolean
   setTheme: (theme: 'dark' | 'light') => void
   setStrictGates: (value: boolean) => void
   setGateCheck: (key: string, value: boolean) => void
   setHabitsEnabled: (value: boolean) => void
+  setBudgetNotifications: (value: boolean) => void
   toggleHabit: (habit: HabitKey, date?: string) => void
   toggleRestWeek: (week: string) => void
   applySyncRecords: (records: SyncRecord[]) => void
@@ -44,6 +53,9 @@ type AppState = {
     habitsEnabled?: boolean
     habits?: Record<HabitKey, string[]>
     restWeeks?: string[]
+    timerSessions?: TimerSession[]
+    activeSessionId?: string | null
+    lastSeenAt?: string | null
   }) => void
   clearMigrationBackup: () => void
   reset: () => void
@@ -84,7 +96,7 @@ export function normalizeTask(task: TaskData): Task {
 
 export const initialTasks: Task[] = taskRows.map(normalizeTask)
 
-type PersistedState = Pick<AppState, 'schemaVersion' | 'tasks' | 'theme' | 'strictGates' | 'gateChecks' | 'habitsEnabled' | 'habits' | 'restWeeks' | 'syncRecords' | 'migrationBackup'>
+type PersistedState = Pick<AppState, 'schemaVersion' | 'tasks' | 'theme' | 'strictGates' | 'gateChecks' | 'habitsEnabled' | 'habits' | 'restWeeks' | 'syncRecords' | 'migrationBackup' | 'timerSessions' | 'activeSessionId' | 'lastSeenAt' | 'budgetNotifications'>
 
 function isPersistedV2(value: unknown): value is PersistedState {
   if (!value || typeof value !== 'object') return false
@@ -92,7 +104,8 @@ function isPersistedV2(value: unknown): value is PersistedState {
   return saved.schemaVersion === 2 && Array.isArray(saved.tasks) &&
     (saved.theme === 'dark' || saved.theme === 'light') &&
     typeof saved.syncRecords === 'object' && saved.syncRecords !== null &&
-    (typeof saved.migrationBackup === 'string' || saved.migrationBackup === null)
+    (typeof saved.migrationBackup === 'string' || saved.migrationBackup === null) &&
+    (saved.timerSessions === undefined || validateTimerSessions(saved.timerSessions))
 }
 
 const freshState = (): PersistedState => ({
@@ -106,10 +119,11 @@ const freshState = (): PersistedState => ({
   restWeeks: [],
   syncRecords: {},
   migrationBackup: null,
+  timerSessions: [], activeSessionId: null, lastSeenAt: null, budgetNotifications: false,
 })
 
 export function migratePersistedState(persisted: unknown, version: number): PersistedState {
-  if (version === 2 && isPersistedV2(persisted)) return persisted
+  if (version === 2 && isPersistedV2(persisted)) return { ...freshState(), ...persisted, timerSessions: (persisted as any).timerSessions ?? [], activeSessionId: (persisted as any).activeSessionId ?? null, lastSeenAt: (persisted as any).lastSeenAt ?? null }
   if (!persisted || typeof persisted !== 'object' || !Object.keys(persisted).length) return freshState()
   return { ...freshState(), migrationBackup: JSON.stringify(persisted, null, 2) }
 }
@@ -138,6 +152,10 @@ function mergePersistedState(persisted: unknown, current: AppState): AppState {
     ...saved,
     schemaVersion: 2,
     tasks: mergeTaskProgress(current.tasks, Array.isArray(saved.tasks) ? saved.tasks : []),
+    timerSessions: Array.isArray(saved.timerSessions) ? saved.timerSessions : [],
+    activeSessionId: typeof saved.activeSessionId === 'string' && (saved.timerSessions ?? []).some(s => s.id === saved.activeSessionId && !s.endedAt)
+      ? saved.activeSessionId : (saved.timerSessions ?? []).find(s => !s.endedAt)?.id ?? null,
+    lastSeenAt: typeof saved.lastSeenAt === 'string' ? saved.lastSeenAt : null,
   }
 }
 
@@ -193,7 +211,12 @@ function changeTask(
 
 export const useRoadmap = create<AppState>()(persist((set) => ({
   ...freshState(),
-  updateTask: (id, update, confirmedLocked = false) => set((state) => changeTask(state, id, update, confirmedLocked) ?? state),
+  updateTask: (id, update, confirmedLocked = false) => set((state) => {
+    const changed = changeTask(state, id, update, confirmedLocked)
+    if (!changed) return state
+    if ((update.status === 'done' || update.status === 'parked') && state.timerSessions.some(s => s.id === state.activeSessionId && s.taskId === id)) return { ...changed, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+    return changed
+  }),
   updateMany: (ids, status) => set((state) => {
     const selected = new Set(ids)
     const updated_at = timestamp()
@@ -207,6 +230,8 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       syncRecords[syncRecordId(record)] = record
       return updated
     })
+    const active = state.timerSessions.find(s => s.id === state.activeSessionId)
+    if (active && selected.has(active.taskId) && (status === 'done' || status === 'parked')) return { tasks, syncRecords, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
     return { tasks, syncRecords }
   }),
   startTask: (id, confirmedLocked = false) => {
@@ -215,10 +240,19 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       const updated = changeTask(state, id, { status: 'in_progress' }, confirmedLocked)
       if (!updated) return state
       started = true
-      return updated
+      const at = timestamp()
+      const sessions = openSession(state.timerSessions, { id: crypto.randomUUID(), taskId: id, startedAt: at, endedAt: null })
+      return { ...updated, timerSessions: sessions, activeSessionId: sessions[sessions.length - 1].id, lastSeenAt: at }
     })
     return started
   },
+  pauseTask: (id) => set((state) => {
+    const active = state.timerSessions.find(s => s.id === state.activeSessionId)
+    if (!active || (id && active.taskId !== id)) return state
+    return { timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+  }),
+  updateLastSeen: (at = timestamp()) => set({ lastSeenAt: at }),
+  trimActiveSession: (at) => set((state) => ({ timerSessions: trimOpenSession(state.timerSessions, at), activeSessionId: null })),
   parkTask: (id, blockerNote) => {
     if (!blockerNote.trim()) return false
     let parked = false
@@ -226,7 +260,7 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       const updated = changeTask(state, id, { status: 'parked', notes: blockerNote.trim() }, true)
       if (!updated) return state
       parked = true
-      return updated
+      return { ...updated, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
     })
     return parked
   },
@@ -237,7 +271,7 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       const updated = changeTask(state, id, { status: 'done' }, confirmedLocked)
       if (!updated) return state
       completed = true
-      return updated
+      return { ...updated, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
     })
     return completed
   },
@@ -245,6 +279,7 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
   setStrictGates: (strictGates) => set({ strictGates }),
   setGateCheck: (key, value) => set((state) => ({ gateChecks: { ...state.gateChecks, [key]: value } })),
   setHabitsEnabled: (habitsEnabled) => set({ habitsEnabled }),
+  setBudgetNotifications: (budgetNotifications) => set({ budgetNotifications }),
   toggleHabit: (habit, date = today()) => set((state) => {
     const dates = state.habits[habit]
     return { habits: { ...state.habits, [habit]: dates.includes(date) ? dates.filter((item) => item !== date) : [...dates, date] } }
@@ -264,6 +299,9 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
     habitsEnabled: data.habitsEnabled ?? state.habitsEnabled,
     habits: data.habits ?? state.habits,
     restWeeks: data.restWeeks ?? state.restWeeks,
+    timerSessions: data.timerSessions ?? state.timerSessions,
+    activeSessionId: data.activeSessionId ?? data.timerSessions?.find(s => !s.endedAt)?.id ?? null,
+    lastSeenAt: data.lastSeenAt ?? state.lastSeenAt,
     tasks: data.tasks ? initialTasks.map((task) => data.tasks!.find((imported) => imported.id === task.id) ?? task) : state.tasks,
   })),
   clearMigrationBackup: () => set({ migrationBackup: null }),
@@ -284,5 +322,9 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
     restWeeks: state.restWeeks,
     syncRecords: state.syncRecords,
     migrationBackup: state.migrationBackup,
+    timerSessions: state.timerSessions,
+    activeSessionId: state.activeSessionId,
+    lastSeenAt: state.lastSeenAt,
+    budgetNotifications: state.budgetNotifications,
   }),
 }))

@@ -25,10 +25,19 @@ function Dashboard() {
   const parked = tasks.filter((task) => task.status === 'parked' && !task.optional)
   const today = new Date().toISOString().slice(0, 10)
   const week = isoWeekKey(new Date())
+  const daysWithFocus = new Set(state.timerSessions.map(s => s.startedAt.slice(0,10))).size
+  const recentFocusMs = state.timerSessions.reduce((sum, s) => { const end = Date.parse(s.endedAt ?? new Date().toISOString()); const start = Math.max(Date.parse(s.startedAt), Date.now() - 14*86400000); return sum + Math.max(0, end - start) }, 0)
+  const recentDays = new Set(Array.from({length:14},(_,i)=>{const d=new Date(); d.setDate(d.getDate()-i); return d.toISOString().slice(0,10)}).filter(day=>new Date(day).getDay()%6!==0)).size
+  const averageDaily = recentDays ? recentFocusMs / 3600000 / recentDays : 0
+  const remaining = Math.max(0, totalHours - doneHours)
+  const projected = averageDaily > 0 ? new Date(Date.now() + remaining / averageDaily * 86400000).toLocaleDateString() : null
 
   const start = () => {
     if (!continueTask) return
-    if (continueTask.status === 'in_progress' || state.startTask(continueTask.id)) navigate(`/task/${continueTask.id}`)
+    const active = state.timerSessions.find(s => s.id === state.activeSessionId)
+    if (active && active.taskId !== continueTask.id) { const old = state.tasks.find(t => t.id === active.taskId); if (!window.confirm(`Pause ${old?.id ?? active.taskId} and start ${continueTask.id}?`)) return; state.pauseTask(active.taskId) }
+    const current = useRoadmap.getState().timerSessions.find(s => s.id === useRoadmap.getState().activeSessionId)
+    if ((current?.taskId === continueTask.id) || state.startTask(continueTask.id)) navigate(`/focus/${continueTask.id}`)
   }
 
   return <>
@@ -44,6 +53,7 @@ function Dashboard() {
         <div className="budget-progress"><Ring value={totalHours ? Math.round(doneHours / totalHours * 100) : 0} size={82} /><div><strong>{doneHours.toFixed(1)} <small>/ {totalHours.toFixed(1)} h</small></strong><span>{doneTasks.length} / {coreTasks.length} core steps</span></div></div>
         <ProgressBar value={totalHours ? doneHours / totalHours * 100 : 0} />
       </Panel>
+      <Panel className="pace-card" title="Pace"><div className="pace-metrics"><span>Average focused / working day<strong>{averageDaily.toFixed(1)} h</strong></span><span>Core hours remaining<strong>{remaining.toFixed(1)} h</strong></span><span>Projected finish<strong>{projected ?? '—'}</strong></span></div>{daysWithFocus === 0 && <p className="muted">Start a timer to build your pace estimate.</p>}<Link to="/analytics">View time analytics <ArrowRight size={14}/></Link></Panel>
       {state.habitsEnabled && <Panel className="habits-card" title="Habits" meta={<span className="tag muted-tag">TODAY</span>}>
         <div className="habit-list">{habitItems.map(({ id, label }) => <label className="habit-row" key={id}><input type="checkbox" checked={state.habits[id].includes(today)} onChange={() => state.toggleHabit(id, today)} /><span>{label}</span><small>{habitStreak(state.habits[id])} day streak</small></label>)}
           <label className="habit-row"><input type="checkbox" checked={state.restWeeks.includes(week)} onChange={() => state.toggleRestWeek(week)} /><span>Rest day this week</span><small>{state.restWeeks.includes(week) ? 'Logged' : 'Not logged'}</small></label>
@@ -63,7 +73,7 @@ function Dashboard() {
         })}</div>
       </Panel>
       {parked.length > 0 && <Panel className="parked-panel" title="Parked" meta={<span className="tag muted-tag">{parked.length}</span>}>
-        {parked.map((task) => <Link className="parked-row" to={`/task/${task.id}`} key={task.id}><span><strong>{task.id}</strong> {task.step}</span><small>{task.notes}</small></Link>)}
+        {parked.map((task) => <div className="parked-row" key={task.id}><Link to={`/task/${task.id}`}><span><strong>{task.id}</strong> {task.step}</span><small>{task.notes}</small></Link><button className="button secondary" onClick={() => { const active=useRoadmap.getState().timerSessions.find(s=>s.id===useRoadmap.getState().activeSessionId); if(active&&active.taskId!==task.id){const old=useRoadmap.getState().tasks.find(t=>t.id===active.taskId);if(!window.confirm(`Pause ${old?.id??active.taskId} and start ${task.id}?`))return;useRoadmap.getState().pauseTask(active.taskId)} if(useRoadmap.getState().startTask(task.id,true))navigate(`/focus/${task.id}`) }}>Resume</button></div>)}
       </Panel>}
     </div>
   </>
