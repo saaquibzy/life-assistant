@@ -4,7 +4,7 @@ import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-ro
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { ArrowDownToLine, ArrowUpRight, Check, Command, Flag, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, Tags, WandSparkles, X, Pause } from "lucide-react";
+import { ArrowUpRight, Check, Command, Flag, LayoutDashboard, ListTodo, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, Tags, WandSparkles, X, Pause } from "lucide-react";
 
 import { useRoadmap } from "./store";
 import { elapsedAcrossSessions, ringLevel } from "./lib/timer";
@@ -30,10 +30,7 @@ const SwipePage = lazy(() => import('./pages/Swipe'));
 
 function App() {
   const theme = useRoadmap((state) => state.theme);
-  const migrationBackup = useRoadmap((state) => state.migrationBackup);
   const swipeDefaultMobile = useRoadmap((state) => state.swipeDefaultMobile);
-  const [backupDownloaded, setBackupDownloaded] = useState(false);
-  const [backupUrl, setBackupUrl] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<{
@@ -65,16 +62,6 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-  useEffect(() => {
-    if (!migrationBackup) {
-      setBackupUrl('');
-      setBackupDownloaded(false);
-      return;
-    }
-    const url = URL.createObjectURL(new Blob([migrationBackup], { type: 'application/json' }));
-    setBackupUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [migrationBackup]);
   useEffect(() => {
     localStorage.setItem("roadmap-sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
@@ -395,17 +382,6 @@ function App() {
           >
             <X size={14} />
           </button>
-        </div>
-      )}
-      {migrationBackup && (
-        <div className="command-backdrop migration-backdrop">
-          <section className="command-box migration-prompt" role="alertdialog" aria-modal="true" aria-labelledby="migration-title">
-            <span className="eyebrow">SCHEMA UPDATE</span>
-            <h2 id="migration-title">Your saved roadmap uses the old week-based format.</h2>
-            <p>Download a JSON backup of that data, then continue with the fresh hours-based roadmap.</p>
-            <a className="button secondary" href={backupUrl} download="roadmap-v1-backup.json" onClick={() => setBackupDownloaded(true)}><ArrowDownToLine size={15} /> Download JSON backup</a>
-            <button className="button primary" disabled={!backupDownloaded} onClick={() => useRoadmap.getState().clearMigrationBackup()}>Start fresh</button>
-          </section>
         </div>
       )}
     </div>

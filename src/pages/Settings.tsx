@@ -3,6 +3,7 @@ import { ArrowDownToLine, Download, Moon, Sun } from 'lucide-react'
 import { type Task, useRoadmap } from '../store'
 import { PageTitle, Panel } from '../components/shared'
 import { useSync } from '../SyncProvider'
+import { validateSyncRecords, type SyncRecord } from '../syncMerge'
 import cutOrder from '../../data/cut-order.json'
 
 const statuses = ['not_started', 'in_progress', 'done', 'parked']
@@ -43,8 +44,10 @@ function SettingsPage() {
     gateChecks: state.gateChecks,
     habitsEnabled: state.habitsEnabled,
     habits: state.habits,
+    swipeDefaultMobile: state.swipeDefaultMobile,
     restWeeks: state.restWeeks,
     timerSessions: state.timerSessions,
+    syncRecords: Object.values(state.syncRecords),
     budgetNotifications: state.budgetNotifications,
     activeSessionId: state.activeSessionId,
     lastSeenAt: state.lastSeenAt,
@@ -54,11 +57,14 @@ function SettingsPage() {
     try {
       const parsed: unknown = JSON.parse(await file.text())
       if (!parsed || typeof parsed !== 'object') throw new Error('That file does not look like a v2 roadmap backup.')
-      const backup = parsed as { schemaVersion?: unknown; tasks?: unknown; theme?: unknown; strictGates?: unknown; gateChecks?: unknown; habitsEnabled?: unknown; habits?: unknown; restWeeks?: unknown; timerSessions?: unknown; activeSessionId?: unknown; lastSeenAt?: unknown }
+      const backup = parsed as { schemaVersion?: unknown; tasks?: unknown; theme?: unknown; strictGates?: unknown; gateChecks?: unknown; habitsEnabled?: unknown; habits?: unknown; swipeDefaultMobile?: unknown; restWeeks?: unknown; timerSessions?: unknown; syncRecords?: unknown; activeSessionId?: unknown; lastSeenAt?: unknown }
       if (backup.schemaVersion !== 2 || !Array.isArray(backup.tasks) || !backup.tasks.every(isTask)) {
         throw new Error('Import a schema v2 JSON backup with valid task records.')
       }
       if (backup.strictGates !== undefined && typeof backup.strictGates !== 'boolean') throw new Error('Invalid strict-gate setting in backup.')
+      if (backup.syncRecords !== undefined && !validateSyncRecords(backup.syncRecords)) throw new Error('Invalid sync records in backup.')
+      if (backup.habitsEnabled !== undefined && typeof backup.habitsEnabled !== 'boolean') throw new Error('Invalid habits setting in backup.')
+      if (backup.swipeDefaultMobile !== undefined && typeof backup.swipeDefaultMobile !== 'boolean') throw new Error('Invalid swipe setting in backup.')
       if (backup.timerSessions !== undefined && (!Array.isArray(backup.timerSessions) || !backup.timerSessions.every((s: any) => s && typeof s.id === 'string' && typeof s.taskId === 'string' && typeof s.startedAt === 'string' && (typeof s.endedAt === 'string' || s.endedAt === null)))) throw new Error('Invalid timer sessions in backup.')
       if (backup.activeSessionId !== undefined && backup.activeSessionId !== null && typeof backup.activeSessionId !== 'string') throw new Error('Invalid active session in backup.')
       if (backup.lastSeenAt !== undefined && backup.lastSeenAt !== null && typeof backup.lastSeenAt !== 'string') throw new Error('Invalid last seen timestamp in backup.')
@@ -69,8 +75,10 @@ function SettingsPage() {
         gateChecks: backup.gateChecks as Record<string, boolean> | undefined,
         habitsEnabled: backup.habitsEnabled as boolean | undefined,
         habits: backup.habits as typeof state.habits | undefined,
+        swipeDefaultMobile: backup.swipeDefaultMobile as boolean | undefined,
         restWeeks: backup.restWeeks as string[] | undefined,
         timerSessions: backup.timerSessions as typeof state.timerSessions | undefined,
+        syncRecords: backup.syncRecords as SyncRecord[] | undefined,
         activeSessionId: backup.activeSessionId as string | null | undefined,
         lastSeenAt: backup.lastSeenAt as string | null | undefined,
       })

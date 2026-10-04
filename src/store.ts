@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import taskRows from '../data/tasks.json'
 import { canStartTask, normalizeNeeds, type RoadmapTask, type TaskStatus } from './lib/roadmap'
-import { syncRecordId, type SyncRecord } from './syncMerge'
+import { syncRecordId, type SessionPayload, type SyncRecord } from './syncMerge'
 import { closeSession, openSession, trimOpenSession, validateTimerSessions, type TimerSession } from './lib/timer'
 import { newId } from './lib/id'
 
@@ -31,7 +31,6 @@ type AppState = {
   habits: Record<HabitKey, string[]>
   restWeeks: string[]
   syncRecords: Record<string, SyncRecord>
-  migrationBackup: string | null
   updateTask: (id: string, update: TaskUpdate, confirmedLocked?: boolean) => void
   updateMany: (ids: string[], status: Status) => void
   startTask: (id: string, confirmedLocked?: boolean) => boolean
@@ -57,12 +56,13 @@ type AppState = {
     gateChecks?: Record<string, boolean>
     habitsEnabled?: boolean
     habits?: Record<HabitKey, string[]>
+    swipeDefaultMobile?: boolean
     restWeeks?: string[]
     timerSessions?: TimerSession[]
+    syncRecords?: SyncRecord[]
     activeSessionId?: string | null
     lastSeenAt?: string | null
   }) => void
-  clearMigrationBackup: () => void
   reset: () => void
 }
 
@@ -101,7 +101,7 @@ export function normalizeTask(task: TaskData): Task {
 
 export const initialTasks: Task[] = taskRows.map(normalizeTask)
 
-type PersistedState = Pick<AppState, 'schemaVersion' | 'tasks' | 'theme' | 'strictGates' | 'gateChecks' | 'habitsEnabled' | 'habits' | 'restWeeks' | 'syncRecords' | 'migrationBackup' | 'timerSessions' | 'activeSessionId' | 'lastSeenAt' | 'budgetNotifications' | 'swipeMode' | 'swipeDefaultMobile'>
+type PersistedState = Pick<AppState, 'schemaVersion' | 'tasks' | 'theme' | 'strictGates' | 'gateChecks' | 'habitsEnabled' | 'habits' | 'restWeeks' | 'syncRecords' | 'timerSessions' | 'activeSessionId' | 'lastSeenAt' | 'budgetNotifications' | 'swipeMode' | 'swipeDefaultMobile'>
 
 function isPersistedV2(value: unknown): value is PersistedState {
   if (!value || typeof value !== 'object') return false
@@ -109,7 +109,6 @@ function isPersistedV2(value: unknown): value is PersistedState {
   return saved.schemaVersion === 2 && Array.isArray(saved.tasks) &&
     (saved.theme === 'dark' || saved.theme === 'light') &&
     typeof saved.syncRecords === 'object' && saved.syncRecords !== null &&
-    (typeof saved.migrationBackup === 'string' || saved.migrationBackup === null) &&
     (saved.timerSessions === undefined || validateTimerSessions(saved.timerSessions))
 }
 
@@ -123,14 +122,12 @@ const freshState = (): PersistedState => ({
   habits: { 'daily-review': [], 'coding-practice': [], 'git-push': [], 'clip-due': [] },
   restWeeks: [],
   syncRecords: {},
-  migrationBackup: null,
   timerSessions: [], activeSessionId: null, lastSeenAt: null, budgetNotifications: false, swipeMode: false, swipeDefaultMobile: false,
 })
 
 export function migratePersistedState(persisted: unknown, version: number): PersistedState {
   if (version === 2 && isPersistedV2(persisted)) return { ...freshState(), ...persisted, timerSessions: (persisted as any).timerSessions ?? [], activeSessionId: (persisted as any).activeSessionId ?? null, lastSeenAt: (persisted as any).lastSeenAt ?? null }
-  if (!persisted || typeof persisted !== 'object' || !Object.keys(persisted).length) return freshState()
-  return { ...freshState(), migrationBackup: JSON.stringify(persisted, null, 2) }
+  return freshState()
 }
 
 export function mergeTaskProgress(currentTasks: Task[], persistedTasks: Task[]): Task[] {
@@ -190,9 +187,28 @@ const makeTaskRecord = (task: Task, updated_at = timestamp()): SyncRecord => ({
 })
 
 function applyTaskRecords(tasks: Task[], records: SyncRecord[]): Task[] {
-  const updates = new Map(records.filter((record) => record.record_type === 'task' && record.payload)
-    .map((record) => [record.record_key, record.payload as TaskUpdate]))
+  const updates = new Map(records.filter((record) => record.record_type === 'task')
+    .map((record) => [record.record_key, record.payload === null ? { status: 'not_started', doneAt: '', notes: '', proofLink: '', minimumPass: false, skippedAt: null } satisfies TaskUpdate : record.payload as TaskUpdate]))
   return tasks.map((task) => updates.has(task.id) ? applyTaskUpdate(task, updates.get(task.id)!) : task)
+}
+
+const makeRecord = (record_type: SyncRecord['record_type'], record_key: string, payload: unknown | null, updated_at = timestamp()): SyncRecord => ({ record_type, record_key, payload, updated_at })
+const sessionPayload = (session: TimerSession): SessionPayload => ({ taskId: session.taskId, startedAt: session.startedAt, endedAt: session.endedAt, ...(session.trimmedFrom ? { trimmedFrom: session.trimmedFrom } : {}) })
+function sessionSyncRecords(sessions: TimerSession[], records: Record<string, SyncRecord>, at = timestamp()) {
+  const next = { ...records }
+  for (const session of sessions) {
+    const existing = next[`session:${session.id}`]
+    const payload = sessionPayload(session)
+    if (!existing || JSON.stringify(existing.payload) !== JSON.stringify(payload)) {
+      const record = makeRecord('session', session.id, payload, at)
+      next[syncRecordId(record)] = record
+    }
+  }
+  return next
+}
+function settingSyncRecord(records: Record<string, SyncRecord>, key: string, payload: unknown) {
+  const record = makeRecord('setting', key, payload)
+  return { ...records, [syncRecordId(record)]: record }
 }
 
 function changeTask(
@@ -219,7 +235,10 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
   updateTask: (id, update, confirmedLocked = false) => set((state) => {
     const changed = changeTask(state, id, update, confirmedLocked)
     if (!changed) return state
-    if ((update.status === 'done' || update.status === 'parked') && state.timerSessions.some(s => s.id === state.activeSessionId && s.taskId === id)) return { ...changed, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+    if ((update.status === 'done' || update.status === 'parked') && state.timerSessions.some(s => s.id === state.activeSessionId && s.taskId === id)) {
+      const at = timestamp(), timerSessions = closeSession(state.timerSessions, at)
+      return { ...changed, timerSessions, activeSessionId: null, syncRecords: sessionSyncRecords(timerSessions, changed.syncRecords, at) }
+    }
     return changed
   }),
   updateMany: (ids, status) => set((state) => {
@@ -236,7 +255,10 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       return updated
     })
     const active = state.timerSessions.find(s => s.id === state.activeSessionId)
-    if (active && selected.has(active.taskId) && (status === 'done' || status === 'parked')) return { tasks, syncRecords, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+    if (active && selected.has(active.taskId) && (status === 'done' || status === 'parked')) {
+      const at = timestamp(), timerSessions = closeSession(state.timerSessions, at)
+      return { tasks, syncRecords: sessionSyncRecords(timerSessions, syncRecords, at), timerSessions, activeSessionId: null }
+    }
     return { tasks, syncRecords }
   }),
   startTask: (id, confirmedLocked = false) => {
@@ -247,17 +269,18 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       started = true
       const at = timestamp()
       const sessions = openSession(state.timerSessions, { id: newId(), taskId: id, startedAt: at, endedAt: null })
-      return { ...updated, timerSessions: sessions, activeSessionId: sessions[sessions.length - 1].id, lastSeenAt: at }
+      return { ...updated, timerSessions: sessions, syncRecords: sessionSyncRecords(sessions, updated.syncRecords, at), activeSessionId: sessions[sessions.length - 1].id, lastSeenAt: at }
     })
     return started
   },
   pauseTask: (id) => set((state) => {
     const active = state.timerSessions.find(s => s.id === state.activeSessionId)
     if (!active || (id && active.taskId !== id)) return state
-    return { timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+    const at = timestamp(), timerSessions = closeSession(state.timerSessions, at)
+    return { timerSessions, syncRecords: sessionSyncRecords(timerSessions, state.syncRecords, at), activeSessionId: null }
   }),
   updateLastSeen: (at = timestamp()) => set({ lastSeenAt: at }),
-  trimActiveSession: (at) => set((state) => ({ timerSessions: trimOpenSession(state.timerSessions, at), activeSessionId: null })),
+  trimActiveSession: (at) => set((state) => { const timerSessions = trimOpenSession(state.timerSessions, at); return { timerSessions, syncRecords: sessionSyncRecords(timerSessions, state.syncRecords, at), activeSessionId: null } }),
   parkTask: (id, blockerNote) => {
     if (!blockerNote.trim()) return false
     let parked = false
@@ -265,7 +288,8 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       const updated = changeTask(state, id, { status: 'parked', notes: blockerNote.trim() }, true)
       if (!updated) return state
       parked = true
-      return { ...updated, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+      const at = timestamp(), timerSessions = closeSession(state.timerSessions, at)
+      return { ...updated, timerSessions, syncRecords: sessionSyncRecords(timerSessions, updated.syncRecords, at), activeSessionId: null }
     })
     return parked
   },
@@ -276,26 +300,41 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
       const updated = changeTask(state, id, { status: 'done' }, confirmedLocked)
       if (!updated) return state
       completed = true
-      return { ...updated, timerSessions: closeSession(state.timerSessions, timestamp()), activeSessionId: null }
+      const at = timestamp(), timerSessions = closeSession(state.timerSessions, at)
+      return { ...updated, timerSessions, syncRecords: sessionSyncRecords(timerSessions, updated.syncRecords, at), activeSessionId: null }
     })
     return completed
   },
   setTheme: (theme) => set({ theme }),
-  setStrictGates: (strictGates) => set({ strictGates }),
+  setStrictGates: (strictGates) => set((state) => ({ strictGates, syncRecords: settingSyncRecord(state.syncRecords, 'strictGates', strictGates) })),
   setGateCheck: (key, value) => set((state) => ({ gateChecks: { ...state.gateChecks, [key]: value } })),
-  setHabitsEnabled: (habitsEnabled) => set({ habitsEnabled }),
-  setBudgetNotifications: (budgetNotifications) => set({ budgetNotifications }),
+  setHabitsEnabled: (habitsEnabled) => set((state) => ({ habitsEnabled, syncRecords: settingSyncRecord(state.syncRecords, 'habitsEnabled', habitsEnabled) })),
+  setBudgetNotifications: (budgetNotifications) => set((state) => ({ budgetNotifications, syncRecords: settingSyncRecord(state.syncRecords, 'notifyAtBudget', budgetNotifications) })),
   setSwipeMode: (swipeMode) => set({ swipeMode }),
-  setSwipeDefaultMobile: (swipeDefaultMobile) => set({ swipeDefaultMobile }),
+  setSwipeDefaultMobile: (swipeDefaultMobile) => set((state) => ({ swipeDefaultMobile, syncRecords: settingSyncRecord(state.syncRecords, 'swipeDefaultHome', swipeDefaultMobile) })),
   toggleHabit: (habit, date = today()) => set((state) => {
     const dates = state.habits[habit]
-    return { habits: { ...state.habits, [habit]: dates.includes(date) ? dates.filter((item) => item !== date) : [...dates, date] } }
+    const checked = !dates.includes(date), record = makeRecord('habit', `${date}:${habit}`, checked ? true : null)
+    return { habits: { ...state.habits, [habit]: checked ? [...dates, date] : dates.filter((item) => item !== date) }, syncRecords: { ...state.syncRecords, [syncRecordId(record)]: record } }
   }),
   toggleRestWeek: (week) => set((state) => ({
     restWeeks: state.restWeeks.includes(week) ? state.restWeeks.filter((item) => item !== week) : [...state.restWeeks, week],
   })),
   applySyncRecords: (records) => set((state) => ({
     tasks: applyTaskRecords(state.tasks, records),
+    timerSessions: records.filter((record) => record.record_type === 'session' && record.payload).map((record) => ({ id: record.record_key, ...(record.payload as SessionPayload) })),
+    activeSessionId: records.filter((record) => record.record_type === 'session' && record.payload).find((record) => !(record.payload as SessionPayload).endedAt)?.record_key ?? null,
+    strictGates: (records.find((record) => record.record_type === 'setting' && record.record_key === 'strictGates' && record.payload !== null)?.payload as boolean | undefined) ?? state.strictGates,
+    habitsEnabled: (records.find((record) => record.record_type === 'setting' && record.record_key === 'habitsEnabled' && record.payload !== null)?.payload as boolean | undefined) ?? state.habitsEnabled,
+    swipeDefaultMobile: (records.find((record) => record.record_type === 'setting' && record.record_key === 'swipeDefaultHome' && record.payload !== null)?.payload as boolean | undefined) ?? state.swipeDefaultMobile,
+    budgetNotifications: (records.find((record) => record.record_type === 'setting' && record.record_key === 'notifyAtBudget' && record.payload !== null)?.payload as boolean | undefined) ?? state.budgetNotifications,
+    habits: records.filter((record) => record.record_type === 'habit').reduce((habits, record) => {
+      const [date, name] = record.record_key.split(':')
+      if (!(name in habits)) return habits
+      const dates = habits[name as HabitKey]
+      habits[name as HabitKey] = record.payload ? [...new Set([...dates, date])] : dates.filter((item) => item !== date)
+      return habits
+    }, { ...state.habits }),
     syncRecords: Object.fromEntries(records.map((record) => [syncRecordId(record), record])),
   })),
   importData: (data) => set((state) => ({
@@ -305,13 +344,14 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
     gateChecks: data.gateChecks ?? state.gateChecks,
     habitsEnabled: data.habitsEnabled ?? state.habitsEnabled,
     habits: data.habits ?? state.habits,
+    swipeDefaultMobile: data.swipeDefaultMobile ?? state.swipeDefaultMobile,
     restWeeks: data.restWeeks ?? state.restWeeks,
     timerSessions: data.timerSessions ?? state.timerSessions,
+    syncRecords: data.syncRecords ? Object.fromEntries(data.syncRecords.map((record) => [syncRecordId(record), record])) : state.syncRecords,
     activeSessionId: data.activeSessionId ?? data.timerSessions?.find(s => !s.endedAt)?.id ?? null,
     lastSeenAt: data.lastSeenAt ?? state.lastSeenAt,
     tasks: data.tasks ? initialTasks.map((task) => data.tasks!.find((imported) => imported.id === task.id) ?? task) : state.tasks,
   })),
-  clearMigrationBackup: () => set({ migrationBackup: null }),
   reset: () => set({ ...freshState() }),
 }), {
   name: 'roadmap-tracker-v1',
@@ -328,7 +368,6 @@ export const useRoadmap = create<AppState>()(persist((set) => ({
     habits: state.habits,
     restWeeks: state.restWeeks,
     syncRecords: state.syncRecords,
-    migrationBackup: state.migrationBackup,
     timerSessions: state.timerSessions,
     activeSessionId: state.activeSessionId,
     lastSeenAt: state.lastSeenAt,

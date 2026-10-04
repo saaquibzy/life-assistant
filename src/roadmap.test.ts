@@ -47,12 +47,11 @@ describe('task state', () => {
     expect(tasks).toHaveLength(186)
   })
 
-  it('migrates v1 numeric week tasks to a fresh v2 plan and preserves a JSON backup', () => {
+  it('loads pre-sync v2 local state and fills in additive defaults', () => {
     const migrated = migratePersistedState({ tasks: [{ id: 1, week: 1 }], taskEdits: { 1: { status: 'Done' } } }, 1)
-    expect(migrated.schemaVersion).toBe(2)
     expect(migrated.tasks).toHaveLength(186)
-    expect(migrated.tasks[0].id).toBe('JB-01')
-    expect(JSON.parse(migrated.migrationBackup ?? '{}')).toMatchObject({ tasks: [{ id: 1, week: 1 }] })
+    const preSync = { schemaVersion: 2 as const, tasks: initialTasks, theme: 'dark' as const, syncRecords: {}, migrationBackup: null }
+    expect(migratePersistedState(preSync, 2)).toMatchObject({ schemaVersion: 2, tasks: initialTasks, timerSessions: [], activeSessionId: null })
   })
 
   it('loads valid legacy v2 data with additive timer defaults', () => {
@@ -80,7 +79,7 @@ describe('task state', () => {
 
   it('starts empty storage with the fresh v2 task list and no backup prompt', () => {
     const fresh = migratePersistedState(undefined, 0)
-    expect(fresh).toMatchObject({ schemaVersion: 2, migrationBackup: null })
+    expect(fresh).toMatchObject({ schemaVersion: 2 })
     expect(fresh.tasks).toHaveLength(186)
     expect(fresh.tasks[0].id).toBe('JB-01')
   })
